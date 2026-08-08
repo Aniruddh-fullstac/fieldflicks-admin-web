@@ -432,7 +432,7 @@ export const LiveFleetView = () => {
                                 cursor: 'pointer',
                               }}
                             >
-                              <Play size={14} fill="#05070A" /> Join Stream
+                              <Play size={14} fill="#05070A" /> Join Live Stream
                             </button>
 
                             {/* STOP STREAM BUTTON */}
@@ -454,13 +454,13 @@ export const LiveFleetView = () => {
                               <Square size={13} fill="currentColor" /> Stop
                             </button>
                           </div>
-                        ) : (
+                        ) : isConfigured ? (
+                          /* CONFIGURED COURT: Start Stream & Settings buttons */
                           <div style={{ display: 'flex', gap: 8 }}>
-                            {/* START LIVE STREAM */}
                             <button
                               onClick={() => handleStartStream(court, venue)}
                               disabled={isActionLoading}
-                              className={isConfigured ? 'btn-primary' : 'btn-secondary'}
+                              className="btn-primary"
                               style={{
                                 flex: 1,
                                 padding: '10px 14px',
@@ -470,27 +470,20 @@ export const LiveFleetView = () => {
                                 justifyContent: 'center',
                                 gap: 6,
                                 opacity: isActionLoading ? 0.7 : 1,
-                                ...(isConfigured
-                                  ? {}
-                                  : {
-                                      borderColor: 'rgba(255, 171, 0, 0.4)',
-                                      color: '#FFB300',
-                                    }),
                               }}
                             >
                               {isActionLoading ? (
                                 <>
                                   <RefreshCw size={14} className="spin" />
-                                  Connecting...
+                                  Starting Live Relay...
                                 </>
                               ) : (
                                 <>
-                                  <Radio size={14} /> Start Stream
+                                  <Radio size={14} /> Start Live Stream
                                 </>
                               )}
                             </button>
 
-                            {/* CONFIGURE COURT BUTTON */}
                             <button
                               onClick={() =>
                                 setConfigureModal({
@@ -499,7 +492,7 @@ export const LiveFleetView = () => {
                                   venueName: venue.turfName,
                                 })
                               }
-                              title="Configure Pi Gateway URL & Mapping"
+                              title="Edit Court Pi Gateway Base URL"
                               className="btn-secondary"
                               style={{
                                 padding: '10px 12px',
@@ -507,10 +500,40 @@ export const LiveFleetView = () => {
                                 display: 'flex',
                                 alignItems: 'center',
                                 justifyContent: 'center',
-                                gap: 4,
                               }}
                             >
                               <Settings size={14} />
+                            </button>
+                          </div>
+                        ) : (
+                          /* UNCONFIGURED COURT: Setup Pi button */
+                          <div style={{ display: 'flex', gap: 8 }}>
+                            <button
+                              onClick={() =>
+                                setConfigureModal({
+                                  court,
+                                  venueId: venue.turfId,
+                                  venueName: venue.turfName,
+                                })
+                              }
+                              style={{
+                                flex: 1,
+                                padding: '10px 14px',
+                                fontSize: '0.8rem',
+                                fontWeight: 700,
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                gap: 8,
+                                borderRadius: 'var(--radius-sm)',
+                                backgroundColor: 'rgba(255, 171, 0, 0.12)',
+                                border: '1px solid rgba(255, 171, 0, 0.4)',
+                                color: '#FFB300',
+                                cursor: 'pointer',
+                                transition: 'all 0.2s ease',
+                              }}
+                            >
+                              <Settings size={14} /> Configure Device URL
                             </button>
                           </div>
                         )}
@@ -550,29 +573,79 @@ export const LiveFleetView = () => {
 
       {/* Unconfigured Streaming Guard Notification Modal */}
       {unconfiguredWarning && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fade-in">
-          <div className="w-full max-w-md bg-zinc-950 border border-amber-500/30 rounded-2xl p-6 shadow-2xl space-y-4">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-400 shrink-0">
-                <WifiOff className="w-5 h-5" />
+        <div
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            width: '100vw',
+            height: '100vh',
+            backgroundColor: 'rgba(3, 6, 12, 0.85)',
+            backdropFilter: 'blur(16px)',
+            WebkitBackdropFilter: 'blur(16px)',
+            display: 'flex',
+            justifyContent: 'center',
+            alignItems: 'center',
+            zIndex: 1000,
+            padding: 20,
+          }}
+          onClick={() => setUnconfiguredWarning(null)}
+        >
+          <div
+            className="glass-card"
+            style={{
+              width: '100%',
+              maxWidth: 460,
+              backgroundColor: '#0C111C',
+              borderRadius: 16,
+              border: '1px solid rgba(255, 171, 0, 0.4)',
+              boxShadow: '0 24px 70px rgba(0, 0, 0, 0.95), 0 0 35px rgba(255, 171, 0, 0.15)',
+              padding: 24,
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 16,
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+              <div
+                style={{
+                  width: 44,
+                  height: 44,
+                  borderRadius: 12,
+                  backgroundColor: 'rgba(255, 171, 0, 0.15)',
+                  border: '1px solid rgba(255, 171, 0, 0.4)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: '#FFB300',
+                  flexShrink: 0,
+                }}
+              >
+                <WifiOff size={22} />
               </div>
               <div>
-                <h3 className="text-base font-bold text-white">Court Not Configured</h3>
-                <p className="text-xs text-zinc-400">
+                <h3 style={{ fontSize: '1.1rem', fontWeight: 800, color: '#FFFFFF', margin: 0 }}>
+                  Court Not Configured
+                </h3>
+                <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', margin: '2px 0 0 0' }}>
                   {unconfiguredWarning.venueName} — {unconfiguredWarning.court.name}
                 </p>
               </div>
             </div>
 
-            <p className="text-xs text-zinc-300 leading-relaxed">
-              This court does not have a Raspberry Pi gateway URL linked to it. You must configure the
-              hardware bridge before activating live streaming.
+            <p style={{ fontSize: '0.82rem', color: '#CBD5E1', lineHeight: 1.5, margin: 0 }}>
+              This court does not have a Raspberry Pi gateway URL linked to it. Please configure the
+              Edge hardware URL before starting a live stream.
             </p>
 
-            <div className="flex items-center justify-end gap-3 pt-2">
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 4 }}>
               <button
                 onClick={() => setUnconfiguredWarning(null)}
-                className="px-4 py-2 rounded-xl border border-zinc-800 text-zinc-400 hover:text-white text-xs font-semibold"
+                className="btn-secondary"
+                style={{ padding: '8px 16px', fontSize: '0.8rem' }}
               >
                 Dismiss
               </button>
@@ -586,9 +659,22 @@ export const LiveFleetView = () => {
                     venueName: target.venueName,
                   });
                 }}
-                className="px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-zinc-950 text-xs font-bold flex items-center gap-1.5 shadow-lg shadow-amber-500/20"
+                style={{
+                  padding: '8px 18px',
+                  borderRadius: 'var(--radius-sm)',
+                  backgroundColor: '#FFB300',
+                  color: '#05070A',
+                  fontSize: '0.8rem',
+                  fontWeight: 700,
+                  border: 'none',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 6,
+                  cursor: 'pointer',
+                  boxShadow: '0 0 16px rgba(255, 171, 0, 0.3)',
+                }}
               >
-                <Settings className="w-3.5 h-3.5" />
+                <Settings size={14} />
                 Configure Court Now
               </button>
             </div>
