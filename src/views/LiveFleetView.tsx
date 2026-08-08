@@ -726,8 +726,9 @@ export const LiveFleetView = () => {
       {/* Extract Recording Modal */}
       {extractModal && (
         <ExtractRecordingModal
-          court={extractModal.court}
-          venueName={extractModal.venueName}
+          initialCourt={extractModal.court}
+          initialVenueName={extractModal.venueName}
+          venues={fleet}
           onClose={() => setExtractModal(null)}
         />
       )}

@@ -15,7 +15,7 @@ import {
 import { AdminApi } from '../services/api';
 import { PlayVideoModal } from '../components/PlayVideoModal';
 import { ExtractRecordingModal } from '../components/ExtractRecordingModal';
-import type { AdminRecordingItem, CourtCamera, VenueFleet } from '../types';
+import type { AdminRecordingItem, VenueFleet } from '../types';
 
 export const RecordingsVaultView = () => {
   const [recordings, setRecordings] = useState<AdminRecordingItem[]>([]);
@@ -29,10 +29,7 @@ export const RecordingsVaultView = () => {
     url: string;
   } | null>(null);
 
-  const [extractModalData, setExtractModalData] = useState<{
-    court: CourtCamera;
-    venueName: string;
-  } | null>(null);
+  const [isExtractModalOpen, setIsExtractModalOpen] = useState<boolean>(false);
 
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
@@ -72,19 +69,8 @@ export const RecordingsVaultView = () => {
     setTimeout(() => setCopiedId(null), 2000);
   };
 
-  // Find first configured court for quick test extraction
-  const handleOpenQuickExtract = () => {
-    for (const v of venues) {
-      const court = v.courts.find((c) => c.isConfigured || c.raspberryPiBaseUrl);
-      if (court) {
-        setExtractModalData({ court, venueName: v.turfName });
-        return;
-      }
-    }
-    // Fallback to first court
-    if (venues.length > 0 && venues[0].courts.length > 0) {
-      setExtractModalData({ court: venues[0].courts[0], venueName: venues[0].turfName });
-    }
+  const handleOpenExtractModal = () => {
+    setIsExtractModalOpen(true);
   };
 
   return (
@@ -130,7 +116,7 @@ export const RecordingsVaultView = () => {
           </button>
 
           <button
-            onClick={handleOpenQuickExtract}
+            onClick={handleOpenExtractModal}
             className="btn-primary"
             style={{
               display: 'flex',
@@ -412,11 +398,10 @@ export const RecordingsVaultView = () => {
       )}
 
       {/* Test Extract Modal */}
-      {extractModalData && (
+      {isExtractModalOpen && (
         <ExtractRecordingModal
-          court={extractModalData.court}
-          venueName={extractModalData.venueName}
-          onClose={() => setExtractModalData(null)}
+          venues={venues}
+          onClose={() => setIsExtractModalOpen(false)}
           onExtractionSuccess={() => {
             fetchData();
           }}

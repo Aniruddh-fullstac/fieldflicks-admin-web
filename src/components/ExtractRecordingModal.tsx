@@ -17,23 +17,33 @@ import {
   Sparkles,
   Server,
   CloudUpload,
+  MapPin,
+  Camera,
+  Check,
 } from 'lucide-react';
 import { AdminApi } from '../services/api';
-import type { CourtCamera } from '../types';
+import type { CourtCamera, VenueFleet } from '../types';
 
 interface ExtractRecordingModalProps {
-  court: CourtCamera;
-  venueName: string;
+  initialCourt?: CourtCamera;
+  initialVenueName?: string;
+  venues?: VenueFleet[];
   onClose: () => void;
   onExtractionSuccess?: () => void;
 }
 
 export const ExtractRecordingModal = ({
-  court,
-  venueName,
+  initialCourt,
+  initialVenueName,
+  venues: passedVenues,
   onClose,
   onExtractionSuccess,
 }: ExtractRecordingModalProps) => {
+  const [venues, setVenues] = useState<VenueFleet[]>(passedVenues || []);
+  const [selectedVenueId, setSelectedVenueId] = useState<string>('');
+  const [selectedCameraId, setSelectedCameraId] = useState<string>(initialCourt?.cameraId || '');
+  const [loadingVenues, setLoadingVenues] = useState<boolean>(false);
+
   const [durationMinutes, setDurationMinutes] = useState<number>(1);
   const [useCustomTime, setUseCustomTime] = useState<boolean>(false);
   const [startTime, setStartTime] = useState<string>('');
@@ -50,6 +60,8 @@ export const ExtractRecordingModal = ({
     startTime: string;
     endTime: string;
     cached?: boolean;
+    venueName?: string;
+    courtName?: string;
   } | null>(null);
 
   const [copied, setCopied] = useState<boolean>(false);
@@ -57,6 +69,82 @@ export const ExtractRecordingModal = ({
   const [isMuted, setIsMuted] = useState<boolean>(false);
   const videoRef = useRef<HTMLVideoElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+
+  // Fetch venues if not provided
+  useEffect(() => {
+    if (!passedVenues || passedVenues.length === 0) {
+      setLoadingVenues(true);
+      AdminApi.getFleet()
+        .then((data) => {
+          setVenues(data);
+          if (data.length > 0) {
+            // Find initial venue if initialCourt provided
+            if (initialCourt) {
+              const matchedVenue = data.find((v) =>
+                v.courts.some((c) => c.cameraId === initialCourt.cameraId)
+              );
+              if (matchedVenue) {
+                setSelectedVenueId(matchedVenue.turfId);
+                setSelectedCameraId(initialCourt.cameraId);
+                return;
+              }
+            }
+            setSelectedVenueId(data[0].turfId);
+            if (data[0].courts.length > 0) {
+              setSelectedCameraId(data[0].courts[0].cameraId);
+            }
+          }
+        })
+        .catch((err) => console.error('Failed to load venues for extraction:', err))
+        .finally(() => setLoadingVenues(false));
+    } else {
+      setVenues(passedVenues);
+      if (initialCourt) {
+        const matched = passedVenues.find((v) =>
+          v.courts.some((c) => c.cameraId === initialCourt.cameraId)
+        );
+        if (matched) {
+          setSelectedVenueId(matched.turfId);
+          setSelectedCameraId(initialCourt.cameraId);
+        } else if (passedVenues.length > 0) {
+          setSelectedVenueId(passedVenues[0].turfId);
+        }
+      } else if (passedVenues.length > 0) {
+        setSelectedVenueId(passedVenues[0].turfId);
+        if (passedVenues[0].courts.length > 0) {
+          setSelectedCameraId(passedVenues[0].courts[0].cameraId);
+        }
+      }
+    }
+  }, [passedVenues, initialCourt]);
+
+  // Current selected venue and court
+  const currentVenue = venues.find((v) => v.turfId === selectedVenueId) || venues[0];
+  const availableCourts = currentVenue ? currentVenue.courts : [];
+  const selectedCourt =
+    availableCourts.find((c) => c.cameraId === selectedCameraId) ||
+    availableCourts[0] ||
+    initialCourt;
+
+  // When venue changes, update selected camera to first court in that venue
+  const handleVenueChange = (newVenueId: string) => {
+    setSelectedVenueId(newVenueId);
+    const venue = venues.find((v) => v.turfId === newVenueId);
+    if (venue && venue.courts.length > 0) {
+      setSelectedCameraId(venue.courts[0].cameraId);
+    } else {
+      setSelectedCameraId('');
+    }
+    // Clear previous extraction result when switching court/venue
+    setResult(null);
+    setError(null);
+  };
+
+  const handleCourtChange = (newCameraId: string) => {
+    setSelectedCameraId(newCameraId);
+    setResult(null);
+    setError(null);
+  };
 
   // Initialize custom timestamps (15 minutes ago to 14 minutes ago)
   useEffect(() => {
@@ -73,16 +161,33 @@ export const ExtractRecordingModal = ({
     setEndTime(toLocalIso(end));
   }, []);
 
+  const isConfigured = !!(
+    selectedCourt &&
+    selectedCourt.raspberryPiBaseUrl &&
+    selectedCourt.raspberryPiBaseUrl.trim().length > 0
+  );
+
   const handleExtract = async () => {
+    if (!selectedCourt || !selectedCourt.cameraId) {
+      setError('Please select a valid court camera first.');
+      return;
+    }
+
+    if (!isConfigured) {
+      setError(
+        `Court "${selectedCourt.name}" is not configured with an active Raspberry Pi Edge Gateway URL. Please configure it in Fleet & Live Courts first.`
+      );
+      return;
+    }
+
     setLoading(true);
     setError(null);
     setResult(null);
     setCurrentStep(1);
 
     try {
-      // Step 1: Send request to backend
       const payload: any = {
-        cameraId: court.cameraId,
+        cameraId: selectedCourt.cameraId,
       };
 
       if (useCustomTime && startTime && endTime) {
@@ -101,7 +206,11 @@ export const ExtractRecordingModal = ({
       clearTimeout(stepTimer2);
 
       setCurrentStep(4);
-      setResult(res);
+      setResult({
+        ...res,
+        venueName: currentVenue?.turfName || initialVenueName || 'Venue',
+        courtName: selectedCourt.name || `Court ${selectedCourt.courtNumber || 1}`,
+      });
       if (onExtractionSuccess) onExtractionSuccess();
     } catch (err: any) {
       setError(
@@ -174,7 +283,7 @@ export const ExtractRecordingModal = ({
         className="glass-card"
         style={{
           width: '100%',
-          maxWidth: result?.playableUrl ? 960 : 640,
+          maxWidth: result?.playableUrl ? 960 : 700,
           backgroundColor: '#0A0F1A',
           borderRadius: 16,
           border: '1px solid rgba(0, 230, 118, 0.35)',
@@ -183,6 +292,7 @@ export const ExtractRecordingModal = ({
           flexDirection: 'column',
           boxShadow: '0 24px 60px rgba(0, 0, 0, 0.9), 0 0 40px rgba(0, 230, 118, 0.15)',
           transition: 'max-width 0.3s ease',
+          maxHeight: '92vh',
         }}
         onClick={(e) => e.stopPropagation()}
       >
@@ -217,7 +327,7 @@ export const ExtractRecordingModal = ({
                 Fetch Match Recording from NVR
               </h3>
               <p style={{ fontSize: '0.75rem', color: 'var(--text-dim)', margin: '2px 0 0 0' }}>
-                {venueName} — {court.name} (Court {court.courtNumber})
+                Select any venue and court to extract recorded match MP4 footage from Dahua NVR
               </p>
             </div>
           </div>
@@ -242,8 +352,154 @@ export const ExtractRecordingModal = ({
         </div>
 
         {/* Content Body */}
-        <div style={{ padding: 24, display: 'flex', flexDirection: 'column', gap: 20 }}>
-          {/* If Result with Playable URL exists, show Player */}
+        <div style={{ padding: 24, display: 'flex', flexDirection: 'column', gap: 20, overflowY: 'auto' }}>
+          {/* VENUE & COURT SELECTION MATRIX */}
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
+              gap: 14,
+              padding: 16,
+              backgroundColor: 'rgba(255, 255, 255, 0.02)',
+              border: '1px solid var(--border-subtle)',
+              borderRadius: 12,
+            }}
+          >
+            {/* Venue Selector */}
+            <div>
+              <label
+                style={{
+                  fontSize: '0.72rem',
+                  color: 'var(--text-dim)',
+                  fontWeight: 700,
+                  textTransform: 'uppercase',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 6,
+                  marginBottom: 6,
+                }}
+              >
+                <MapPin size={13} color="var(--primary-neon)" /> 1. Select Venue / Arena
+              </label>
+              <select
+                value={selectedVenueId}
+                onChange={(e) => handleVenueChange(e.target.value)}
+                disabled={loading || loadingVenues}
+                style={{
+                  width: '100%',
+                  backgroundColor: 'rgba(0, 0, 0, 0.5)',
+                  border: '1px solid var(--border-subtle)',
+                  borderRadius: 8,
+                  padding: '10px 12px',
+                  color: '#FFFFFF',
+                  fontSize: '0.85rem',
+                  fontWeight: 600,
+                  outline: 'none',
+                  cursor: 'pointer',
+                }}
+              >
+                {venues.map((v) => (
+                  <option key={v.turfId} value={v.turfId}>
+                    {v.turfName} ({v.courts.length} Courts)
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* Court / Camera Selector */}
+            <div>
+              <label
+                style={{
+                  fontSize: '0.72rem',
+                  color: 'var(--text-dim)',
+                  fontWeight: 700,
+                  textTransform: 'uppercase',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 6,
+                  marginBottom: 6,
+                }}
+              >
+                <Camera size={13} color="var(--primary-neon)" /> 2. Select Court / Channel
+              </label>
+              <select
+                value={selectedCameraId}
+                onChange={(e) => handleCourtChange(e.target.value)}
+                disabled={loading || availableCourts.length === 0}
+                style={{
+                  width: '100%',
+                  backgroundColor: 'rgba(0, 0, 0, 0.5)',
+                  border: '1px solid var(--border-subtle)',
+                  borderRadius: 8,
+                  padding: '10px 12px',
+                  color: '#FFFFFF',
+                  fontSize: '0.85rem',
+                  fontWeight: 600,
+                  outline: 'none',
+                  cursor: 'pointer',
+                }}
+              >
+                {availableCourts.length === 0 ? (
+                  <option value="">No courts registered</option>
+                ) : (
+                  availableCourts.map((c) => (
+                    <option key={c.cameraId} value={c.cameraId}>
+                      {c.name || `Court ${c.courtNumber}`} (Channel {c.courtNumber}) —{' '}
+                      {c.isConfigured || c.raspberryPiBaseUrl ? 'Configured' : 'Unconfigured'}
+                    </option>
+                  ))
+                )}
+              </select>
+            </div>
+
+            {/* Court Status Pill & Edge Info */}
+            <div
+              style={{
+                gridColumn: '1 / -1',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                flexWrap: 'wrap',
+                gap: 8,
+                paddingTop: 8,
+                borderTop: '1px solid rgba(255, 255, 255, 0.05)',
+                fontSize: '0.75rem',
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span style={{ color: 'var(--text-dim)' }}>Edge Hardware Status:</span>
+                <span
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: 4,
+                    padding: '2px 8px',
+                    borderRadius: 12,
+                    fontSize: '0.7rem',
+                    fontWeight: 700,
+                    backgroundColor: isConfigured
+                      ? 'rgba(0, 230, 118, 0.12)'
+                      : 'rgba(255, 171, 0, 0.12)',
+                    color: isConfigured ? '#00E676' : '#FFAB00',
+                    border: `1px solid ${
+                      isConfigured ? 'rgba(0, 230, 118, 0.3)' : 'rgba(255, 171, 0, 0.3)'
+                    }`,
+                  }}
+                >
+                  {isConfigured ? <Check size={11} /> : <AlertCircle size={11} />}
+                  {isConfigured ? 'EDGE PI CONFIGURED' : 'UNCONFIGURED (NO PI LINKED)'}
+                </span>
+              </div>
+
+              {selectedCourt?.raspberryPiBaseUrl && (
+                <div style={{ color: 'var(--text-dim)', fontFamily: 'monospace' }}>
+                  Gateway: {selectedCourt.raspberryPiBaseUrl}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* If Result with Playable URL exists, show Inline Video Player */}
           {result?.playableUrl ? (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
               <div
@@ -317,7 +573,7 @@ export const ExtractRecordingModal = ({
                       {isMuted ? <VolumeX size={18} /> : <Volume2 size={18} />}
                     </button>
                     <span style={{ fontSize: '0.75rem', color: 'var(--primary-neon)', fontWeight: 600 }}>
-                      NVR RECORDED MATCH
+                      {result.venueName} — {result.courtName}
                     </span>
                   </div>
 
@@ -645,7 +901,7 @@ export const ExtractRecordingModal = ({
 
               <button
                 onClick={handleExtract}
-                disabled={loading}
+                disabled={loading || !isConfigured}
                 className="btn-primary"
                 style={{
                   padding: '8px 22px',
@@ -653,14 +909,21 @@ export const ExtractRecordingModal = ({
                   display: 'flex',
                   alignItems: 'center',
                   gap: 8,
-                  opacity: loading ? 0.7 : 1,
-                  backgroundColor: 'var(--primary-neon)',
+                  opacity: loading || !isConfigured ? 0.6 : 1,
+                  backgroundColor: isConfigured ? 'var(--primary-neon)' : '#64748B',
                   color: '#05070A',
                   fontWeight: 700,
+                  cursor: isConfigured && !loading ? 'pointer' : 'not-allowed',
                 }}
               >
                 {loading ? <RefreshCw size={14} className="spin" /> : <Film size={14} />}
-                <span>{loading ? 'Extracting from NVR...' : 'Fetch & Extract Video'}</span>
+                <span>
+                  {!isConfigured
+                    ? 'Configure Court to Extract'
+                    : loading
+                    ? 'Extracting from NVR...'
+                    : 'Fetch & Extract Video'}
+                </span>
               </button>
             </>
           )}
