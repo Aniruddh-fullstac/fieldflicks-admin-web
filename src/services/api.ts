@@ -189,8 +189,29 @@ export const AdminApi = {
   },
 
   async testPiConnectivity(url: string): Promise<{ success: boolean; message: string; data?: any }> {
-    const res = await api.post('/admin/cameras/test-connectivity', { url });
-    return extractData<any>(res);
+    try {
+      const res = await api.post('/admin/cameras/test-connectivity', { url });
+      return extractData<any>(res);
+    } catch (err: any) {
+      // Direct browser fallback probe to Pi /health if backend is currently restarting/deploying
+      try {
+        const cleanUrl = url.trim().replace(/\/+$/, '');
+        const target = cleanUrl.endsWith('/health') ? cleanUrl : `${cleanUrl}/health`;
+        const start = Date.now();
+        const probe = await fetch(target, { method: 'GET' });
+        const latency = Date.now() - start;
+        if (probe.ok || probe.status === 200) {
+          const body = await probe.json().catch(() => ({ status: 'OK' }));
+          return {
+            success: true,
+            message: `Device reached directly (${latency}ms): ${JSON.stringify(body)}`,
+          };
+        }
+      } catch {
+        // Ignore direct probe error and throw backend error
+      }
+      throw err;
+    }
   },
 
   async startLiveStream(cameraId: string, courtName: string): Promise<any> {
