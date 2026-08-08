@@ -20,6 +20,9 @@ import {
   MapPin,
   Camera,
   Check,
+  Calendar,
+  Layers,
+  ArrowRight,
 } from 'lucide-react';
 import { AdminApi } from '../services/api';
 import type { CourtCamera, VenueFleet } from '../types';
@@ -44,10 +47,19 @@ export const ExtractRecordingModal = ({
   const [selectedCameraId, setSelectedCameraId] = useState<string>(initialCourt?.cameraId || '');
   const [loadingVenues, setLoadingVenues] = useState<boolean>(false);
 
-  const [durationMinutes, setDurationMinutes] = useState<number>(1);
-  const [useCustomTime, setUseCustomTime] = useState<boolean>(false);
-  const [startTime, setStartTime] = useState<string>('');
-  const [endTime, setEndTime] = useState<string>('');
+  // Picker Mode: 'preset' | 'custom'
+  const [pickerMode, setPickerMode] = useState<'preset' | 'custom'>('preset');
+
+  // Preset configuration
+  const [presetDuration, setPresetDuration] = useState<number>(1);
+  const [presetOffsetMinutes, setPresetOffsetMinutes] = useState<number>(15);
+
+  // Custom Calendar & Time Picker state
+  const [selectedDate, setSelectedDate] = useState<string>(''); // YYYY-MM-DD
+  const [selectedStartTime, setSelectedStartTime] = useState<string>(''); // HH:MM
+  const [selectedDuration, setSelectedDuration] = useState<number>(5); // in minutes
+  const [useExplicitEndTime, setUseExplicitEndTime] = useState<boolean>(false);
+  const [selectedEndTime, setSelectedEndTime] = useState<string>(''); // HH:MM
 
   const [loading, setLoading] = useState<boolean>(false);
   const [currentStep, setCurrentStep] = useState<number>(0);
@@ -70,6 +82,26 @@ export const ExtractRecordingModal = ({
   const videoRef = useRef<HTMLVideoElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
+  // Initialize dates & times
+  useEffect(() => {
+    const now = new Date();
+    const pad = (n: number) => n.toString().padStart(2, '0');
+
+    // Default Date to Today (Local)
+    const todayStr = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+    setSelectedDate(todayStr);
+
+    // Default Start Time to 15 minutes ago
+    const fifteenAgo = new Date(now.getTime() - 15 * 60 * 1000);
+    const startStr = `${pad(fifteenAgo.getHours())}:${pad(fifteenAgo.getMinutes())}`;
+    setSelectedStartTime(startStr);
+
+    // Default End Time to 10 minutes ago (5 min clip)
+    const tenAgo = new Date(now.getTime() - 10 * 60 * 1000);
+    const endStr = `${pad(tenAgo.getHours())}:${pad(tenAgo.getMinutes())}`;
+    setSelectedEndTime(endStr);
+  }, []);
+
   // Fetch venues if not provided
   useEffect(() => {
     if (!passedVenues || passedVenues.length === 0) {
@@ -78,7 +110,6 @@ export const ExtractRecordingModal = ({
         .then((data) => {
           setVenues(data);
           if (data.length > 0) {
-            // Find initial venue if initialCourt provided
             if (initialCourt) {
               const matchedVenue = data.find((v) =>
                 v.courts.some((c) => c.cameraId === initialCourt.cameraId)
@@ -126,7 +157,6 @@ export const ExtractRecordingModal = ({
     availableCourts[0] ||
     initialCourt;
 
-  // When venue changes, update selected camera to first court in that venue
   const handleVenueChange = (newVenueId: string) => {
     setSelectedVenueId(newVenueId);
     const venue = venues.find((v) => v.turfId === newVenueId);
@@ -135,7 +165,6 @@ export const ExtractRecordingModal = ({
     } else {
       setSelectedCameraId('');
     }
-    // Clear previous extraction result when switching court/venue
     setResult(null);
     setError(null);
   };
@@ -146,26 +175,75 @@ export const ExtractRecordingModal = ({
     setError(null);
   };
 
-  // Initialize custom timestamps (15 minutes ago to 14 minutes ago)
-  useEffect(() => {
-    const now = new Date();
-    const end = new Date(now.getTime() - 14 * 60 * 1000);
-    const start = new Date(end.getTime() - 1 * 60 * 1000);
-
-    const toLocalIso = (d: Date) => {
-      const offset = d.getTimezoneOffset() * 60000;
-      return new Date(d.getTime() - offset).toISOString().slice(0, 16);
-    };
-
-    setStartTime(toLocalIso(start));
-    setEndTime(toLocalIso(end));
-  }, []);
-
   const isConfigured = !!(
     selectedCourt &&
     selectedCourt.raspberryPiBaseUrl &&
     selectedCourt.raspberryPiBaseUrl.trim().length > 0
   );
+
+  // Quick Date Pill helper
+  const setQuickDate = (daysAgo: number) => {
+    const d = new Date();
+    d.setDate(d.getDate() - daysAgo);
+    const pad = (n: number) => n.toString().padStart(2, '0');
+    setSelectedDate(`${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`);
+  };
+
+  // Quick Time Pill helper
+  const setQuickTime = (hours: number, minutes: number = 0) => {
+    const pad = (n: number) => n.toString().padStart(2, '0');
+    setSelectedStartTime(`${pad(hours)}:${pad(minutes)}`);
+  };
+
+  // Compute calculated timestamps for Custom Mode
+  const getCalculatedTimeWindow = () => {
+    if (pickerMode === 'preset') {
+      const now = new Date();
+      const end = new Date(now.getTime() - (presetOffsetMinutes - presetDuration) * 60 * 1000);
+      const start = new Date(now.getTime() - presetOffsetMinutes * 60 * 1000);
+      return {
+        startDate: start,
+        endDate: end,
+        durationMinutes: presetDuration,
+        startIso: start.toISOString(),
+        endIso: end.toISOString(),
+      };
+    } else {
+      if (!selectedDate || !selectedStartTime) {
+        return null;
+      }
+      const [year, month, day] = selectedDate.split('-').map(Number);
+      const [startH, startM] = selectedStartTime.split(':').map(Number);
+
+      const start = new Date(year, month - 1, day, startH, startM, 0, 0);
+
+      let end: Date;
+      let dur: number;
+
+      if (useExplicitEndTime && selectedEndTime) {
+        const [endH, endM] = selectedEndTime.split(':').map(Number);
+        end = new Date(year, month - 1, day, endH, endM, 0, 0);
+        if (end <= start) {
+          // If end time is earlier, assume next day midnight overlap
+          end = new Date(end.getTime() + 24 * 60 * 60 * 1000);
+        }
+        dur = Math.round((end.getTime() - start.getTime()) / (60 * 1000));
+      } else {
+        dur = selectedDuration;
+        end = new Date(start.getTime() + selectedDuration * 60 * 1000);
+      }
+
+      return {
+        startDate: start,
+        endDate: end,
+        durationMinutes: dur,
+        startIso: start.toISOString(),
+        endIso: end.toISOString(),
+      };
+    }
+  };
+
+  const calculatedWindow = getCalculatedTimeWindow();
 
   const handleExtract = async () => {
     if (!selectedCourt || !selectedCourt.cameraId) {
@@ -180,6 +258,16 @@ export const ExtractRecordingModal = ({
       return;
     }
 
+    if (!calculatedWindow) {
+      setError('Please choose a valid Date and Start Time.');
+      return;
+    }
+
+    if (calculatedWindow.endDate <= calculatedWindow.startDate) {
+      setError('End Time must be strictly after Start Time.');
+      return;
+    }
+
     setLoading(true);
     setError(null);
     setResult(null);
@@ -188,14 +276,9 @@ export const ExtractRecordingModal = ({
     try {
       const payload: any = {
         cameraId: selectedCourt.cameraId,
+        startTime: calculatedWindow.startIso,
+        endTime: calculatedWindow.endIso,
       };
-
-      if (useCustomTime && startTime && endTime) {
-        payload.startTime = new Date(startTime).toISOString();
-        payload.endTime = new Date(endTime).toISOString();
-      } else {
-        payload.durationMinutes = durationMinutes;
-      }
 
       // Progress animation simulation
       const stepTimer1 = setTimeout(() => setCurrentStep(2), 2500);
@@ -275,7 +358,7 @@ export const ExtractRecordingModal = ({
         justifyContent: 'center',
         alignItems: 'center',
         zIndex: 200,
-        padding: 24,
+        padding: 20,
       }}
       onClick={onClose}
     >
@@ -283,7 +366,7 @@ export const ExtractRecordingModal = ({
         className="glass-card"
         style={{
           width: '100%',
-          maxWidth: result?.playableUrl ? 960 : 700,
+          maxWidth: result?.playableUrl ? 960 : 720,
           backgroundColor: '#0A0F1A',
           borderRadius: 16,
           border: '1px solid rgba(0, 230, 118, 0.35)',
@@ -292,14 +375,14 @@ export const ExtractRecordingModal = ({
           flexDirection: 'column',
           boxShadow: '0 24px 60px rgba(0, 0, 0, 0.9), 0 0 40px rgba(0, 230, 118, 0.15)',
           transition: 'max-width 0.3s ease',
-          maxHeight: '92vh',
+          maxHeight: '94vh',
         }}
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
         <div
           style={{
-            padding: '18px 24px',
+            padding: '16px 24px',
             borderBottom: '1px solid var(--border-subtle)',
             display: 'flex',
             justifyContent: 'space-between',
@@ -327,7 +410,7 @@ export const ExtractRecordingModal = ({
                 Fetch Match Recording from NVR
               </h3>
               <p style={{ fontSize: '0.75rem', color: 'var(--text-dim)', margin: '2px 0 0 0' }}>
-                Select any venue and court to extract recorded match MP4 footage from Dahua NVR
+                Select court, date & time window to extract match MP4 video from Dahua NVR storage
               </p>
             </div>
           </div>
@@ -352,14 +435,14 @@ export const ExtractRecordingModal = ({
         </div>
 
         {/* Content Body */}
-        <div style={{ padding: 24, display: 'flex', flexDirection: 'column', gap: 20, overflowY: 'auto' }}>
-          {/* VENUE & COURT SELECTION MATRIX */}
+        <div style={{ padding: 24, display: 'flex', flexDirection: 'column', gap: 18, overflowY: 'auto' }}>
+          {/* SECTION 1: VENUE & COURT SELECTION MATRIX */}
           <div
             style={{
               display: 'grid',
               gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
-              gap: 14,
-              padding: 16,
+              gap: 12,
+              padding: 14,
               backgroundColor: 'rgba(255, 255, 255, 0.02)',
               border: '1px solid var(--border-subtle)',
               borderRadius: 12,
@@ -369,7 +452,7 @@ export const ExtractRecordingModal = ({
             <div>
               <label
                 style={{
-                  fontSize: '0.72rem',
+                  fontSize: '0.7rem',
                   color: 'var(--text-dim)',
                   fontWeight: 700,
                   textTransform: 'uppercase',
@@ -379,7 +462,7 @@ export const ExtractRecordingModal = ({
                   marginBottom: 6,
                 }}
               >
-                <MapPin size={13} color="var(--primary-neon)" /> 1. Select Venue / Arena
+                <MapPin size={12} color="var(--primary-neon)" /> 1. Select Venue / Arena
               </label>
               <select
                 value={selectedVenueId}
@@ -390,9 +473,9 @@ export const ExtractRecordingModal = ({
                   backgroundColor: 'rgba(0, 0, 0, 0.5)',
                   border: '1px solid var(--border-subtle)',
                   borderRadius: 8,
-                  padding: '10px 12px',
+                  padding: '8px 12px',
                   color: '#FFFFFF',
-                  fontSize: '0.85rem',
+                  fontSize: '0.82rem',
                   fontWeight: 600,
                   outline: 'none',
                   cursor: 'pointer',
@@ -410,7 +493,7 @@ export const ExtractRecordingModal = ({
             <div>
               <label
                 style={{
-                  fontSize: '0.72rem',
+                  fontSize: '0.7rem',
                   color: 'var(--text-dim)',
                   fontWeight: 700,
                   textTransform: 'uppercase',
@@ -420,7 +503,7 @@ export const ExtractRecordingModal = ({
                   marginBottom: 6,
                 }}
               >
-                <Camera size={13} color="var(--primary-neon)" /> 2. Select Court / Channel
+                <Camera size={12} color="var(--primary-neon)" /> 2. Select Court / Channel
               </label>
               <select
                 value={selectedCameraId}
@@ -431,9 +514,9 @@ export const ExtractRecordingModal = ({
                   backgroundColor: 'rgba(0, 0, 0, 0.5)',
                   border: '1px solid var(--border-subtle)',
                   borderRadius: 8,
-                  padding: '10px 12px',
+                  padding: '8px 12px',
                   color: '#FFFFFF',
-                  fontSize: '0.85rem',
+                  fontSize: '0.82rem',
                   fontWeight: 600,
                   outline: 'none',
                   cursor: 'pointer',
@@ -452,7 +535,7 @@ export const ExtractRecordingModal = ({
               </select>
             </div>
 
-            {/* Court Status Pill & Edge Info */}
+            {/* Hardware Status Pill */}
             <div
               style={{
                 gridColumn: '1 / -1',
@@ -461,13 +544,13 @@ export const ExtractRecordingModal = ({
                 justifyContent: 'space-between',
                 flexWrap: 'wrap',
                 gap: 8,
-                paddingTop: 8,
-                borderTop: '1px solid rgba(255, 255, 255, 0.05)',
-                fontSize: '0.75rem',
+                paddingTop: 6,
+                borderTop: '1px solid rgba(255, 255, 255, 0.04)',
+                fontSize: '0.72rem',
               }}
             >
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <span style={{ color: 'var(--text-dim)' }}>Edge Hardware Status:</span>
+                <span style={{ color: 'var(--text-dim)' }}>Edge Hardware:</span>
                 <span
                   style={{
                     display: 'inline-flex',
@@ -475,7 +558,7 @@ export const ExtractRecordingModal = ({
                     gap: 4,
                     padding: '2px 8px',
                     borderRadius: 12,
-                    fontSize: '0.7rem',
+                    fontSize: '0.68rem',
                     fontWeight: 700,
                     backgroundColor: isConfigured
                       ? 'rgba(0, 230, 118, 0.12)'
@@ -499,9 +582,10 @@ export const ExtractRecordingModal = ({
             </div>
           </div>
 
-          {/* If Result with Playable URL exists, show Inline Video Player */}
+          {/* SECTION 2: RESULT PLAYER OR TIME PICKER */}
           {result?.playableUrl ? (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+            /* Inline Video Player Box */
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
               <div
                 style={{
                   display: 'flex',
@@ -519,7 +603,6 @@ export const ExtractRecordingModal = ({
                 </div>
               </div>
 
-              {/* Video Player Box */}
               <div
                 ref={containerRef}
                 style={{
@@ -544,7 +627,6 @@ export const ExtractRecordingModal = ({
                   onClick={togglePlay}
                 />
 
-                {/* Video Controls Overlay */}
                 <div
                   style={{
                     position: 'absolute',
@@ -586,17 +668,16 @@ export const ExtractRecordingModal = ({
                 </div>
               </div>
 
-              {/* Extraction Metadata Info */}
               <div
                 style={{
                   display: 'grid',
-                  gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-                  gap: 12,
-                  padding: 14,
+                  gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
+                  gap: 10,
+                  padding: 12,
                   backgroundColor: 'rgba(255, 255, 255, 0.02)',
                   border: '1px solid var(--border-subtle)',
                   borderRadius: 8,
-                  fontSize: '0.75rem',
+                  fontSize: '0.72rem',
                 }}
               >
                 <div>
@@ -618,158 +699,431 @@ export const ExtractRecordingModal = ({
               </div>
             </div>
           ) : (
-            /* Time Range & Extraction Selection Controls */
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
-              <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', lineHeight: 1.5 }}>
-                Dahua NVR continuously records 24/7 video footage. Select a time slice to extract the match MP4 file and upload it to the cloud:
-              </div>
-
-              {/* Preset selection tabs */}
-              <div>
-                <label style={{ fontSize: '0.75rem', color: 'var(--text-dim)', fontWeight: 600, display: 'block', marginBottom: 8 }}>
-                  EXTRACTION PRESETS
-                </label>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10 }}>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setUseCustomTime(false);
-                      setDurationMinutes(1);
-                    }}
-                    style={{
-                      padding: '10px 14px',
-                      borderRadius: 8,
-                      border: !useCustomTime && durationMinutes === 1 ? '1px solid var(--primary-neon)' : '1px solid var(--border-subtle)',
-                      backgroundColor: !useCustomTime && durationMinutes === 1 ? 'rgba(0, 230, 118, 0.12)' : 'rgba(255, 255, 255, 0.03)',
-                      color: !useCustomTime && durationMinutes === 1 ? 'var(--primary-neon)' : '#FFFFFF',
-                      fontSize: '0.8rem',
-                      fontWeight: 600,
-                      cursor: 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      gap: 6,
-                    }}
-                  >
-                    <Clock size={14} /> 1 Min Test Clip
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setUseCustomTime(false);
-                      setDurationMinutes(3);
-                    }}
-                    style={{
-                      padding: '10px 14px',
-                      borderRadius: 8,
-                      border: !useCustomTime && durationMinutes === 3 ? '1px solid var(--primary-neon)' : '1px solid var(--border-subtle)',
-                      backgroundColor: !useCustomTime && durationMinutes === 3 ? 'rgba(0, 230, 118, 0.12)' : 'rgba(255, 255, 255, 0.03)',
-                      color: !useCustomTime && durationMinutes === 3 ? 'var(--primary-neon)' : '#FFFFFF',
-                      fontSize: '0.8rem',
-                      fontWeight: 600,
-                      cursor: 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      gap: 6,
-                    }}
-                  >
-                    <Clock size={14} /> 3 Min Segment
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setUseCustomTime(false);
-                      setDurationMinutes(5);
-                    }}
-                    style={{
-                      padding: '10px 14px',
-                      borderRadius: 8,
-                      border: !useCustomTime && durationMinutes === 5 ? '1px solid var(--primary-neon)' : '1px solid var(--border-subtle)',
-                      backgroundColor: !useCustomTime && durationMinutes === 5 ? 'rgba(0, 230, 118, 0.12)' : 'rgba(255, 255, 255, 0.03)',
-                      color: !useCustomTime && durationMinutes === 5 ? 'var(--primary-neon)' : '#FFFFFF',
-                      fontSize: '0.8rem',
-                      fontWeight: 600,
-                      cursor: 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      gap: 6,
-                    }}
-                  >
-                    <Clock size={14} /> 5 Min Segment
-                  </button>
-                </div>
-              </div>
-
-              {/* Custom Date Time toggle */}
-              <div style={{ marginTop: 4 }}>
+            /* SECTION 3: CALENDAR & TIME PICKER CONTROLS */
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+              {/* Mode Switch Tabs */}
+              <div
+                style={{
+                  display: 'flex',
+                  backgroundColor: 'rgba(0, 0, 0, 0.4)',
+                  padding: 4,
+                  borderRadius: 10,
+                  border: '1px solid var(--border-subtle)',
+                }}
+              >
                 <button
                   type="button"
-                  onClick={() => setUseCustomTime(!useCustomTime)}
+                  onClick={() => setPickerMode('preset')}
                   style={{
-                    background: 'none',
+                    flex: 1,
+                    padding: '8px 14px',
+                    borderRadius: 8,
                     border: 'none',
-                    color: useCustomTime ? 'var(--primary-neon)' : 'var(--text-dim)',
-                    fontSize: '0.75rem',
-                    fontWeight: 600,
+                    backgroundColor: pickerMode === 'preset' ? 'rgba(0, 230, 118, 0.15)' : 'transparent',
+                    color: pickerMode === 'preset' ? 'var(--primary-neon)' : 'var(--text-dim)',
+                    fontSize: '0.78rem',
+                    fontWeight: 700,
                     cursor: 'pointer',
                     display: 'flex',
                     alignItems: 'center',
+                    justifyContent: 'center',
                     gap: 6,
                   }}
                 >
-                  <Sparkles size={13} />
-                  <span>{useCustomTime ? 'Using Custom Start & End Time (Click for Presets)' : 'Or Specify Custom Start & End Time'}</span>
+                  <Clock size={14} /> Quick Presets (Recent Footage)
                 </button>
 
-                {useCustomTime && (
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginTop: 10 }}>
-                    <div>
-                      <label style={{ fontSize: '0.7rem', color: 'var(--text-dim)', display: 'block', marginBottom: 4 }}>
-                        START TIME
-                      </label>
-                      <input
-                        type="datetime-local"
-                        value={startTime}
-                        onChange={(e) => setStartTime(e.target.value)}
+                <button
+                  type="button"
+                  onClick={() => setPickerMode('custom')}
+                  style={{
+                    flex: 1,
+                    padding: '8px 14px',
+                    borderRadius: 8,
+                    border: 'none',
+                    backgroundColor: pickerMode === 'custom' ? 'rgba(0, 230, 118, 0.15)' : 'transparent',
+                    color: pickerMode === 'custom' ? 'var(--primary-neon)' : 'var(--text-dim)',
+                    fontSize: '0.78rem',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: 6,
+                  }}
+                >
+                  <Calendar size={14} /> Calendar & Time Picker (Any Date/Hour)
+                </button>
+              </div>
+
+              {pickerMode === 'preset' ? (
+                /* PRESETS MODE */
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                  <label style={{ fontSize: '0.7rem', color: 'var(--text-dim)', fontWeight: 700, textTransform: 'uppercase' }}>
+                    SELECT RECENT TIME SLICE
+                  </label>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 10 }}>
+                    {[
+                      { dur: 1, offset: 15, label: '1-Min Test Clip', sub: '15 mins ago (Instant Verify)' },
+                      { dur: 3, offset: 15, label: '3-Min Highlight', sub: '15 mins ago' },
+                      { dur: 5, offset: 20, label: '5-Min Segment', sub: '20 mins ago' },
+                      { dur: 10, offset: 30, label: '10-Min Clip', sub: '30 mins ago' },
+                      { dur: 30, offset: 60, label: '30-Min Half Match', sub: '1 hour ago' },
+                      { dur: 60, offset: 90, label: '60-Min Full Match', sub: '90 mins ago' },
+                    ].map((p) => {
+                      const isSel = presetDuration === p.dur && presetOffsetMinutes === p.offset;
+                      return (
+                        <button
+                          key={`${p.dur}-${p.offset}`}
+                          type="button"
+                          onClick={() => {
+                            setPresetDuration(p.dur);
+                            setPresetOffsetMinutes(p.offset);
+                          }}
+                          style={{
+                            padding: '12px 14px',
+                            borderRadius: 10,
+                            border: isSel ? '1px solid var(--primary-neon)' : '1px solid var(--border-subtle)',
+                            backgroundColor: isSel ? 'rgba(0, 230, 118, 0.12)' : 'rgba(255, 255, 255, 0.02)',
+                            color: isSel ? 'var(--primary-neon)' : '#FFFFFF',
+                            textAlign: 'left',
+                            cursor: 'pointer',
+                            transition: 'all 0.15s ease',
+                          }}
+                        >
+                          <div style={{ fontSize: '0.82rem', fontWeight: 700 }}>{p.label}</div>
+                          <div style={{ fontSize: '0.68rem', color: isSel ? '#00E676' : 'var(--text-dim)', marginTop: 2 }}>
+                            {p.sub}
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              ) : (
+                /* CUSTOM CALENDAR & TIME PICKER */
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+                  {/* Row 1: Date Picker with Quick Date Pills */}
+                  <div
+                    style={{
+                      padding: 14,
+                      backgroundColor: 'rgba(255, 255, 255, 0.02)',
+                      border: '1px solid var(--border-subtle)',
+                      borderRadius: 10,
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: 10,
+                    }}
+                  >
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
+                      <label
                         style={{
-                          width: '100%',
-                          backgroundColor: 'rgba(0, 0, 0, 0.4)',
-                          border: '1px solid var(--border-subtle)',
-                          borderRadius: 6,
-                          padding: '8px 10px',
-                          color: '#FFFFFF',
-                          fontSize: '0.75rem',
-                          outline: 'none',
+                          fontSize: '0.72rem',
+                          color: 'var(--text-dim)',
+                          fontWeight: 700,
+                          textTransform: 'uppercase',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 6,
                         }}
-                      />
+                      >
+                        <Calendar size={13} color="var(--primary-neon)" /> 1. Select Match Date
+                      </label>
+
+                      {/* Quick Date Pills */}
+                      <div style={{ display: 'flex', gap: 6 }}>
+                        <button
+                          type="button"
+                          onClick={() => setQuickDate(0)}
+                          style={{
+                            padding: '4px 10px',
+                            borderRadius: 6,
+                            fontSize: '0.68rem',
+                            fontWeight: 600,
+                            border: '1px solid var(--border-subtle)',
+                            backgroundColor: 'rgba(255, 255, 255, 0.05)',
+                            color: '#FFFFFF',
+                            cursor: 'pointer',
+                          }}
+                        >
+                          Today
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setQuickDate(1)}
+                          style={{
+                            padding: '4px 10px',
+                            borderRadius: 6,
+                            fontSize: '0.68rem',
+                            fontWeight: 600,
+                            border: '1px solid var(--border-subtle)',
+                            backgroundColor: 'rgba(255, 255, 255, 0.05)',
+                            color: '#FFFFFF',
+                            cursor: 'pointer',
+                          }}
+                        >
+                          Yesterday
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setQuickDate(2)}
+                          style={{
+                            padding: '4px 10px',
+                            borderRadius: 6,
+                            fontSize: '0.68rem',
+                            fontWeight: 600,
+                            border: '1px solid var(--border-subtle)',
+                            backgroundColor: 'rgba(255, 255, 255, 0.05)',
+                            color: '#FFFFFF',
+                            cursor: 'pointer',
+                          }}
+                        >
+                          2 Days Ago
+                        </button>
+                      </div>
                     </div>
-                    <div>
-                      <label style={{ fontSize: '0.7rem', color: 'var(--text-dim)', display: 'block', marginBottom: 4 }}>
-                        END TIME
+
+                    <input
+                      type="date"
+                      value={selectedDate}
+                      onChange={(e) => setSelectedDate(e.target.value)}
+                      style={{
+                        width: '100%',
+                        backgroundColor: 'rgba(0, 0, 0, 0.5)',
+                        border: '1px solid var(--border-subtle)',
+                        borderRadius: 8,
+                        padding: '10px 14px',
+                        color: '#FFFFFF',
+                        fontSize: '0.85rem',
+                        fontWeight: 600,
+                        outline: 'none',
+                        colorScheme: 'dark',
+                      }}
+                    />
+                  </div>
+
+                  {/* Row 2: Start Time & Duration / End Time */}
+                  <div
+                    style={{
+                      display: 'grid',
+                      gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
+                      gap: 12,
+                    }}
+                  >
+                    {/* Start Time Column */}
+                    <div
+                      style={{
+                        padding: 14,
+                        backgroundColor: 'rgba(255, 255, 255, 0.02)',
+                        border: '1px solid var(--border-subtle)',
+                        borderRadius: 10,
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: 10,
+                      }}
+                    >
+                      <label
+                        style={{
+                          fontSize: '0.72rem',
+                          color: 'var(--text-dim)',
+                          fontWeight: 700,
+                          textTransform: 'uppercase',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 6,
+                        }}
+                      >
+                        <Clock size={13} color="var(--primary-neon)" /> 2. Start Time
                       </label>
+
                       <input
-                        type="datetime-local"
-                        value={endTime}
-                        onChange={(e) => setEndTime(e.target.value)}
+                        type="time"
+                        value={selectedStartTime}
+                        onChange={(e) => setSelectedStartTime(e.target.value)}
                         style={{
                           width: '100%',
-                          backgroundColor: 'rgba(0, 0, 0, 0.4)',
+                          backgroundColor: 'rgba(0, 0, 0, 0.5)',
                           border: '1px solid var(--border-subtle)',
-                          borderRadius: 6,
-                          padding: '8px 10px',
+                          borderRadius: 8,
+                          padding: '10px 14px',
                           color: '#FFFFFF',
-                          fontSize: '0.75rem',
+                          fontSize: '0.85rem',
+                          fontWeight: 600,
                           outline: 'none',
+                          colorScheme: 'dark',
                         }}
                       />
+
+                      {/* Quick Start Time Chips */}
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                        {[
+                          { h: 8, m: 0, l: '8:00 AM' },
+                          { h: 10, m: 0, l: '10:00 AM' },
+                          { h: 14, m: 0, l: '2:00 PM' },
+                          { h: 16, m: 0, l: '4:00 PM' },
+                          { h: 18, m: 0, l: '6:00 PM' },
+                          { h: 20, m: 0, l: '8:00 PM' },
+                        ].map((t) => (
+                          <button
+                            key={t.l}
+                            type="button"
+                            onClick={() => setQuickTime(t.h, t.m)}
+                            style={{
+                              padding: '3px 8px',
+                              borderRadius: 6,
+                              fontSize: '0.65rem',
+                              border: '1px solid var(--border-subtle)',
+                              backgroundColor: 'rgba(255, 255, 255, 0.03)',
+                              color: 'var(--text-dim)',
+                              cursor: 'pointer',
+                            }}
+                          >
+                            {t.l}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Duration / End Time Column */}
+                    <div
+                      style={{
+                        padding: 14,
+                        backgroundColor: 'rgba(255, 255, 255, 0.02)',
+                        border: '1px solid var(--border-subtle)',
+                        borderRadius: 10,
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: 10,
+                      }}
+                    >
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <label
+                          style={{
+                            fontSize: '0.72rem',
+                            color: 'var(--text-dim)',
+                            fontWeight: 700,
+                            textTransform: 'uppercase',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: 6,
+                          }}
+                        >
+                          <Layers size={13} color="var(--primary-neon)" /> 3. Match Duration
+                        </label>
+
+                        <button
+                          type="button"
+                          onClick={() => setUseExplicitEndTime(!useExplicitEndTime)}
+                          style={{
+                            background: 'none',
+                            border: 'none',
+                            color: 'var(--accent-cyan)',
+                            fontSize: '0.68rem',
+                            fontWeight: 600,
+                            cursor: 'pointer',
+                            textDecoration: 'underline',
+                          }}
+                        >
+                          {useExplicitEndTime ? 'Switch to Duration (Mins)' : 'Or Exact End Time'}
+                        </button>
+                      </div>
+
+                      {useExplicitEndTime ? (
+                        <input
+                          type="time"
+                          value={selectedEndTime}
+                          onChange={(e) => setSelectedEndTime(e.target.value)}
+                          style={{
+                            width: '100%',
+                            backgroundColor: 'rgba(0, 0, 0, 0.5)',
+                            border: '1px solid var(--border-subtle)',
+                            borderRadius: 8,
+                            padding: '10px 14px',
+                            color: '#FFFFFF',
+                            fontSize: '0.85rem',
+                            fontWeight: 600,
+                            outline: 'none',
+                            colorScheme: 'dark',
+                          }}
+                        />
+                      ) : (
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 6 }}>
+                          {[1, 2, 5, 10, 30, 60].map((dur) => (
+                            <button
+                              key={dur}
+                              type="button"
+                              onClick={() => setSelectedDuration(dur)}
+                              style={{
+                                padding: '8px 10px',
+                                borderRadius: 6,
+                                border: selectedDuration === dur ? '1px solid var(--primary-neon)' : '1px solid var(--border-subtle)',
+                                backgroundColor: selectedDuration === dur ? 'rgba(0, 230, 118, 0.15)' : 'rgba(255, 255, 255, 0.03)',
+                                color: selectedDuration === dur ? 'var(--primary-neon)' : '#FFFFFF',
+                                fontSize: '0.75rem',
+                                fontWeight: 700,
+                                cursor: 'pointer',
+                              }}
+                            >
+                              {dur === 60 ? '60m (1 hr)' : `${dur} mins`}
+                            </button>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   </div>
-                )}
-              </div>
+                </div>
+              )}
+
+              {/* LIVE CALCULATED MATCH WINDOW BANNER */}
+              {calculatedWindow && (
+                <div
+                  style={{
+                    backgroundColor: 'rgba(0, 230, 118, 0.05)',
+                    border: '1px solid rgba(0, 230, 118, 0.25)',
+                    borderRadius: 10,
+                    padding: '12px 16px',
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    flexWrap: 'wrap',
+                    gap: 10,
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <Sparkles size={16} color="var(--primary-neon)" />
+                    <div>
+                      <div style={{ fontSize: '0.8rem', fontWeight: 700, color: '#FFFFFF' }}>
+                        {calculatedWindow.startDate.toLocaleDateString(undefined, {
+                          weekday: 'short',
+                          month: 'short',
+                          day: 'numeric',
+                        })}{' '}
+                        • {calculatedWindow.startDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                        {' '}<ArrowRight size={12} style={{ display: 'inline', margin: '0 2px' }} />{' '}
+                        {calculatedWindow.endDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                      </div>
+                      <div style={{ fontSize: '0.68rem', color: 'var(--text-dim)', marginTop: 2 }}>
+                        Extracting {calculatedWindow.durationMinutes} minute(s) segment from NVR HDD storage
+                      </div>
+                    </div>
+                  </div>
+
+                  <span
+                    style={{
+                      padding: '4px 10px',
+                      backgroundColor: 'rgba(0, 230, 118, 0.12)',
+                      border: '1px solid rgba(0, 230, 118, 0.3)',
+                      borderRadius: 12,
+                      color: 'var(--primary-neon)',
+                      fontSize: '0.72rem',
+                      fontWeight: 700,
+                    }}
+                  >
+                    {calculatedWindow.durationMinutes} MINS
+                  </span>
+                </div>
+              )}
 
               {/* Progress Steps during Extraction */}
               {loading && (
