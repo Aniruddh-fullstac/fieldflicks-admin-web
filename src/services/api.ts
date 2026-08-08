@@ -170,6 +170,29 @@ export const AdminApi = {
     return Array.isArray(raw) ? raw : [];
   },
 
+  async updateCameraMapping(
+    cameraId: string,
+    data: { name?: string; court_number?: number; raspberryPiBaseUrl?: string }
+  ): Promise<any> {
+    const res = await api.put(`/admin/cameras/${cameraId}`, data);
+    return extractData<any>(res);
+  },
+
+  async createCameraMapping(data: {
+    turfId: string;
+    name?: string;
+    court_number?: number;
+    raspberryPiBaseUrl?: string;
+  }): Promise<any> {
+    const res = await api.post('/admin/cameras', data);
+    return extractData<any>(res);
+  },
+
+  async testPiConnectivity(url: string): Promise<{ success: boolean; message: string; data?: any }> {
+    const res = await api.post('/admin/cameras/test-connectivity', { url });
+    return extractData<any>(res);
+  },
+
   async startLiveStream(cameraId: string, courtName: string): Promise<any> {
     const res = await api.post('/recording/start-live-stream', {
       cameraId,

@@ -8,10 +8,16 @@ import {
   RefreshCw,
   AlertTriangle,
   RadioTower,
+  Settings,
+  Plus,
+  Wifi,
+  WifiOff,
+  AlertCircle,
 } from 'lucide-react';
 import { AdminApi } from '../services/api';
 import { SkeletonCardList } from '../components/Skeleton';
 import { LiveStreamModal } from '../components/LiveStreamModal';
+import { ConfigureCourtModal } from '../components/ConfigureCourtModal';
 import {
   DiagnosticErrorModal,
   parseDiagnosticError,
@@ -25,10 +31,26 @@ export const LiveFleetView = () => {
   const [error, setError] = useState<string | null>(null);
   const [actionLoadingId, setActionLoadingId] = useState<string | null>(null);
   const [diagnosticError, setDiagnosticError] = useState<DiagnosticErrorInfo | null>(null);
+  
+  // Live player modal
   const [activeModal, setActiveModal] = useState<{
     court: CourtCamera;
     venueName: string;
     playbackUrl: string;
+  } | null>(null);
+
+  // Configure / Add Court Modal state
+  const [configureModal, setConfigureModal] = useState<{
+    court?: CourtCamera | null;
+    venueId: string;
+    venueName: string;
+  } | null>(null);
+
+  // Unconfigured court warning prompt modal
+  const [unconfiguredWarning, setUnconfiguredWarning] = useState<{
+    court: CourtCamera;
+    venueId: string;
+    venueName: string;
   } | null>(null);
 
   const fetchFleet = () => {
@@ -51,10 +73,21 @@ export const LiveFleetView = () => {
     fetchFleet();
   }, []);
 
-  const handleStartStream = async (court: CourtCamera, venueName: string) => {
+  const handleStartStream = async (court: CourtCamera, venue: VenueFleet) => {
+    // STREAMING GUARD: Immediately notify if court isn't configured
+    const isConfigured = !!(court.raspberryPiBaseUrl && court.raspberryPiBaseUrl.trim().length > 0);
+    if (!isConfigured) {
+      setUnconfiguredWarning({
+        court,
+        venueId: venue.turfId,
+        venueName: venue.turfName,
+      });
+      return;
+    }
+
     setActionLoadingId(court.cameraId);
     try {
-      const res = await AdminApi.startLiveStream(court.cameraId, `${venueName} ${court.name}`);
+      const res = await AdminApi.startLiveStream(court.cameraId, `${venue.turfName} ${court.name}`);
       const playbackUrl = res.playbackUrl || `https://stream.mux.com/live-${court.cameraId}.m3u8`;
 
       // Update fleet state
@@ -72,14 +105,14 @@ export const LiveFleetView = () => {
       // Open stream player modal
       setActiveModal({
         court: { ...court, isLiveStreaming: true, livePlaybackUrl: playbackUrl },
-        venueName,
+        venueName: venue.turfName,
         playbackUrl,
       });
       setActionLoadingId(null);
     } catch (err: any) {
       setActionLoadingId(null);
       const diag = parseDiagnosticError(err, {
-        courtName: `${venueName} — ${court.name}`,
+        courtName: `${venue.turfName} — ${court.name}`,
         courtNumber: court.courtNumber,
         deviceUrl: court.raspberryPiBaseUrl,
       });
@@ -125,6 +158,20 @@ export const LiveFleetView = () => {
     });
   };
 
+  // Fleet summary stats
+  const totalCourts = fleet.reduce((sum, v) => sum + (v.courts?.length || 0), 0);
+  const configuredCourts = fleet.reduce(
+    (sum, v) =>
+      sum +
+      (v.courts?.filter((c) => !!(c.raspberryPiBaseUrl && c.raspberryPiBaseUrl.trim().length > 0))
+        ?.length || 0),
+    0
+  );
+  const activeStreams = fleet.reduce(
+    (sum, v) => sum + (v.courts?.filter((c) => !!c.isLiveStreaming)?.length || 0),
+    0
+  );
+
   return (
     <div className="view-padding" style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
       {/* Header and Controls */}
@@ -138,14 +185,42 @@ export const LiveFleetView = () => {
           </p>
         </div>
 
-        <button
-          onClick={fetchFleet}
-          className="btn-secondary"
-          style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 14px', fontSize: '0.8rem' }}
-        >
-          <RefreshCw size={14} />
-          Sync Fleet Status
-        </button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          {/* Quick Stats Pill */}
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 12,
+              padding: '6px 14px',
+              backgroundColor: 'rgba(255, 255, 255, 0.03)',
+              border: '1px solid var(--border-subtle)',
+              borderRadius: 'var(--radius-sm)',
+              fontSize: '0.75rem',
+            }}
+          >
+            <div>
+              <span style={{ color: 'var(--text-muted)' }}>Configured: </span>
+              <strong style={{ color: '#00E676' }}>
+                {configuredCourts}/{totalCourts}
+              </strong>
+            </div>
+            <div style={{ width: 1, height: 12, backgroundColor: 'var(--border-subtle)' }} />
+            <div>
+              <span style={{ color: 'var(--text-muted)' }}>Live: </span>
+              <strong style={{ color: '#00E5FF' }}>{activeStreams}</strong>
+            </div>
+          </div>
+
+          <button
+            onClick={fetchFleet}
+            className="btn-secondary"
+            style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 14px', fontSize: '0.8rem' }}
+          >
+            <RefreshCw size={14} />
+            Sync Fleet Status
+          </button>
+        </div>
       </div>
 
       {error && (
@@ -209,14 +284,35 @@ export const LiveFleetView = () => {
                   </div>
                 </div>
 
-                <div style={{ display: 'flex', gap: 16, fontSize: '0.8rem' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, color: 'var(--text-muted)' }}>
-                    <Cpu size={15} color="var(--primary-neon)" />
-                    Courts: <span style={{ color: '#FFFFFF', fontWeight: 600 }}>{venue.courts.length}</span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+                  <div style={{ display: 'flex', gap: 14, fontSize: '0.8rem' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, color: 'var(--text-muted)' }}>
+                      <Cpu size={15} color="var(--primary-neon)" />
+                      Courts: <span style={{ color: '#FFFFFF', fontWeight: 600 }}>{venue.courts?.length || 0}</span>
+                    </div>
                   </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, color: 'var(--text-muted)' }}>
-                    Status: <span style={{ color: 'var(--primary-neon)', fontWeight: 600 }}>Connected</span>
-                  </div>
+
+                  {/* Add Court Button for this Venue */}
+                  <button
+                    onClick={() =>
+                      setConfigureModal({
+                        court: null,
+                        venueId: venue.turfId,
+                        venueName: venue.turfName,
+                      })
+                    }
+                    className="btn-secondary"
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 6,
+                      padding: '6px 12px',
+                      fontSize: '0.75rem',
+                    }}
+                  >
+                    <Plus size={13} />
+                    Add Court
+                  </button>
                 </div>
               </div>
 
@@ -228,6 +324,9 @@ export const LiveFleetView = () => {
               }}>
                 {venue.courts.map((court) => {
                   const isLive = !!court.isLiveStreaming;
+                  const isConfigured = !!(
+                    court.raspberryPiBaseUrl && court.raspberryPiBaseUrl.trim().length > 0
+                  );
                   const isActionLoading = actionLoadingId === court.cameraId;
 
                   return (
@@ -238,10 +337,14 @@ export const LiveFleetView = () => {
                         borderRadius: 'var(--radius-sm)',
                         backgroundColor: isLive
                           ? 'rgba(0, 230, 118, 0.08)'
-                          : 'rgba(255, 255, 255, 0.02)',
+                          : isConfigured
+                          ? 'rgba(255, 255, 255, 0.02)'
+                          : 'rgba(255, 171, 0, 0.03)',
                         border: isLive
                           ? '1px solid rgba(0, 230, 118, 0.4)'
-                          : '1px solid var(--border-subtle)',
+                          : isConfigured
+                          ? '1px solid var(--border-subtle)'
+                          : '1px solid rgba(255, 171, 0, 0.3)',
                         display: 'flex',
                         flexDirection: 'column',
                         justifyContent: 'space-between',
@@ -250,27 +353,58 @@ export const LiveFleetView = () => {
                       }}
                     >
                       <div>
+                        {/* Court Name and Status Badge */}
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                          <span style={{ fontWeight: 700, color: '#FFFFFF', fontSize: '0.95rem' }}>{court.name}</span>
+                          <span style={{ fontWeight: 700, color: '#FFFFFF', fontSize: '0.95rem' }}>
+                            {court.name}
+                          </span>
                           {isLive ? (
                             <span className="badge-neon green" style={{ gap: 5, fontSize: '0.65rem', fontWeight: 800 }}>
                               <span className="live-pulse" /> LIVE STREAMING
                             </span>
-                          ) : court.status === 'ONLINE' ? (
-                            <span className="badge-neon cyan" style={{ fontSize: '0.65rem' }}>ONLINE</span>
+                          ) : isConfigured ? (
+                            <span
+                              className="badge-neon cyan"
+                              style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: '0.65rem' }}
+                            >
+                              <Wifi size={10} /> CONFIG & ONLINE
+                            </span>
                           ) : (
-                            <span className="badge-neon crimson" style={{ fontSize: '0.65rem' }}>OFFLINE</span>
+                            <span
+                              style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: 4,
+                                fontSize: '0.65rem',
+                                fontWeight: 700,
+                                padding: '3px 8px',
+                                borderRadius: 100,
+                                backgroundColor: 'rgba(255, 171, 0, 0.15)',
+                                color: '#FFB300',
+                                border: '1px solid rgba(255, 171, 0, 0.4)',
+                              }}
+                            >
+                              <WifiOff size={10} /> NOT CONFIGURED
+                            </span>
                           )}
                         </div>
 
                         <div style={{ marginTop: 10, fontSize: '0.75rem', color: 'var(--text-dim)', display: 'flex', flexDirection: 'column', gap: 4 }}>
                           <div>Court Number: <strong style={{ color: '#FFFFFF' }}>Court {court.courtNumber}</strong></div>
                           <div>Camera ID: <code style={{ color: 'var(--text-muted)' }}>{court.cameraId.slice(0, 16)}...</code></div>
-                          {court.raspberryPiBaseUrl && (
+                          
+                          {isConfigured ? (
                             <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 2 }}>
                               <RadioTower size={12} color="var(--primary-neon)" />
                               <span style={{ color: 'var(--text-dim)' }}>Bridge: </span>
-                              <code style={{ color: 'var(--primary-neon)', fontSize: '0.7rem' }}>{court.raspberryPiBaseUrl}</code>
+                              <code style={{ color: 'var(--primary-neon)', fontSize: '0.7rem' }}>
+                                {court.raspberryPiBaseUrl}
+                              </code>
+                            </div>
+                          ) : (
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 2, color: '#FFB300' }}>
+                              <AlertCircle size={12} />
+                              <span style={{ fontSize: '0.7rem' }}>No Raspberry Pi gateway linked</span>
                             </div>
                           )}
                         </div>
@@ -280,7 +414,7 @@ export const LiveFleetView = () => {
                       <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                         {isLive ? (
                           <div style={{ display: 'flex', gap: 8 }}>
-                            {/* JOIN STREAM BUTTON - Only clickable when stream is active */}
+                            {/* JOIN STREAM BUTTON */}
                             <button
                               onClick={() => handleJoinStream(court, venue.turfName)}
                               className="btn-primary"
@@ -321,33 +455,64 @@ export const LiveFleetView = () => {
                             </button>
                           </div>
                         ) : (
-                          /* START LIVE STREAM - When inactive */
-                          <button
-                            onClick={() => handleStartStream(court, venue.turfName)}
-                            disabled={isActionLoading}
-                            className="btn-primary"
-                            style={{
-                              width: '100%',
-                              padding: '10px 14px',
-                              fontSize: '0.8rem',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              gap: 8,
-                              opacity: isActionLoading ? 0.7 : 1,
-                            }}
-                          >
-                            {isActionLoading ? (
-                              <>
-                                <RefreshCw size={14} className="spin" />
-                                Connecting to Device...
-                              </>
-                            ) : (
-                              <>
-                                <Radio size={14} /> Start Live Stream
-                              </>
-                            )}
-                          </button>
+                          <div style={{ display: 'flex', gap: 8 }}>
+                            {/* START LIVE STREAM */}
+                            <button
+                              onClick={() => handleStartStream(court, venue)}
+                              disabled={isActionLoading}
+                              className={isConfigured ? 'btn-primary' : 'btn-secondary'}
+                              style={{
+                                flex: 1,
+                                padding: '10px 14px',
+                                fontSize: '0.8rem',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                gap: 6,
+                                opacity: isActionLoading ? 0.7 : 1,
+                                ...(isConfigured
+                                  ? {}
+                                  : {
+                                      borderColor: 'rgba(255, 171, 0, 0.4)',
+                                      color: '#FFB300',
+                                    }),
+                              }}
+                            >
+                              {isActionLoading ? (
+                                <>
+                                  <RefreshCw size={14} className="spin" />
+                                  Connecting...
+                                </>
+                              ) : (
+                                <>
+                                  <Radio size={14} /> Start Stream
+                                </>
+                              )}
+                            </button>
+
+                            {/* CONFIGURE COURT BUTTON */}
+                            <button
+                              onClick={() =>
+                                setConfigureModal({
+                                  court,
+                                  venueId: venue.turfId,
+                                  venueName: venue.turfName,
+                                })
+                              }
+                              title="Configure Pi Gateway URL & Mapping"
+                              className="btn-secondary"
+                              style={{
+                                padding: '10px 12px',
+                                fontSize: '0.75rem',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                gap: 4,
+                              }}
+                            >
+                              <Settings size={14} />
+                            </button>
+                          </div>
                         )}
                       </div>
                     </div>
@@ -370,7 +535,68 @@ export const LiveFleetView = () => {
         />
       )}
 
-      {/* Deep Diagnostic Error Modal (replaces browser alert popups) */}
+      {/* Configure / Add Court Device Modal */}
+      {configureModal && (
+        <ConfigureCourtModal
+          court={configureModal.court}
+          venueId={configureModal.venueId}
+          venueName={configureModal.venueName}
+          onClose={() => setConfigureModal(null)}
+          onSaved={() => {
+            fetchFleet();
+          }}
+        />
+      )}
+
+      {/* Unconfigured Streaming Guard Notification Modal */}
+      {unconfiguredWarning && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fade-in">
+          <div className="w-full max-w-md bg-zinc-950 border border-amber-500/30 rounded-2xl p-6 shadow-2xl space-y-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-400 shrink-0">
+                <WifiOff className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="text-base font-bold text-white">Court Not Configured</h3>
+                <p className="text-xs text-zinc-400">
+                  {unconfiguredWarning.venueName} — {unconfiguredWarning.court.name}
+                </p>
+              </div>
+            </div>
+
+            <p className="text-xs text-zinc-300 leading-relaxed">
+              This court does not have a Raspberry Pi gateway URL linked to it. You must configure the
+              hardware bridge before activating live streaming.
+            </p>
+
+            <div className="flex items-center justify-end gap-3 pt-2">
+              <button
+                onClick={() => setUnconfiguredWarning(null)}
+                className="px-4 py-2 rounded-xl border border-zinc-800 text-zinc-400 hover:text-white text-xs font-semibold"
+              >
+                Dismiss
+              </button>
+              <button
+                onClick={() => {
+                  const target = unconfiguredWarning;
+                  setUnconfiguredWarning(null);
+                  setConfigureModal({
+                    court: target.court,
+                    venueId: target.venueId,
+                    venueName: target.venueName,
+                  });
+                }}
+                className="px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-zinc-950 text-xs font-bold flex items-center gap-1.5 shadow-lg shadow-amber-500/20"
+              >
+                <Settings className="w-3.5 h-3.5" />
+                Configure Court Now
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Deep Diagnostic Error Modal */}
       <DiagnosticErrorModal
         error={diagnosticError}
         onClose={() => setDiagnosticError(null)}
@@ -383,3 +609,4 @@ export const LiveFleetView = () => {
     </div>
   );
 };
+
