@@ -10,10 +10,23 @@ import type {
 
 const defaultProdUrl = 'https://fieldfflix-backend.onrender.com';
 const isDev = import.meta.env.DEV;
-const rawBaseUrl = import.meta.env.VITE_API_URL !== undefined && import.meta.env.VITE_API_URL !== ''
-  ? import.meta.env.VITE_API_URL
+let rawBaseUrl = import.meta.env.VITE_API_URL !== undefined && import.meta.env.VITE_API_URL !== ''
+  ? String(import.meta.env.VITE_API_URL)
   : (isDev ? '' : defaultProdUrl);
-const API_BASE_URL = rawBaseUrl.replace(/\/+$/, '');
+
+// Sanitize accidental copy-paste in Vercel env settings (e.g. trailing "vite_api_url=")
+rawBaseUrl = rawBaseUrl
+  .replace(/^VITE_API_URL\s*=\s*/i, '')
+  .replace(/vite_api_url.*$/i, '')
+  .replace(/=+$/, '')
+  .replace(/\/+$/, '')
+  .trim();
+
+if (!rawBaseUrl && !isDev) {
+  rawBaseUrl = defaultProdUrl;
+}
+
+const API_BASE_URL = rawBaseUrl;
 
 const api = axios.create({
   baseURL: API_BASE_URL || undefined,
