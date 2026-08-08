@@ -1,4 +1,4 @@
-import { BarChart3, Users, Trophy, Ticket, Video } from 'lucide-react';
+import { BarChart3, Users, Trophy, Ticket, Video, Film } from 'lucide-react';
 
 interface MobileBottomNavProps {
   activeTab: string;
@@ -15,6 +15,7 @@ export const MobileBottomNav = ({
     { id: 'tournaments', label: 'Tournaments', icon: Trophy },
     { id: 'coupons', label: 'Coupons', icon: Ticket },
     { id: 'fleet', label: 'Fleet', icon: Video },
+    { id: 'recordings', label: 'Recordings', icon: Film },
   ];
 
   return (

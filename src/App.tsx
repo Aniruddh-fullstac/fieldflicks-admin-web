@@ -8,6 +8,7 @@ import { TournamentsView } from './views/TournamentsView';
 import { CouponsView } from './views/CouponsView';
 import { LiveFleetView } from './views/LiveFleetView';
 import { WatchStreamView } from './views/WatchStreamView';
+import { RecordingsVaultView } from './views/RecordingsVaultView';
 
 export function App() {
   const [activeTab, setActiveTab] = useState('overview');
@@ -51,6 +52,8 @@ export function App() {
         return <CouponsView />;
       case 'fleet':
         return <LiveFleetView />;
+      case 'recordings':
+        return <RecordingsVaultView />;
       default:
         return <OverviewView />;
     }
@@ -82,6 +85,11 @@ export function App() {
         return {
           title: 'Fleet & Live Courts',
           subtitle: 'Edge NVR cameras, RTSP streams, and on-demand Mux broadcast control',
+        };
+      case 'recordings':
+        return {
+          title: 'Match Recordings Vault',
+          subtitle: 'Browse, test NVR video extraction, and watch match footage',
         };
       default:
         return { title: 'Admin Console' };

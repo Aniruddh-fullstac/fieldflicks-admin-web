@@ -5,6 +5,7 @@ import {
   Ticket,
   Video,
   Radio,
+  Film,
   Zap,
   ShieldCheck,
   X,
@@ -31,6 +32,7 @@ export const Sidebar = ({
     { id: 'tournaments', label: 'Tournaments Hub', icon: Trophy },
     { id: 'coupons', label: 'Coupons & Free Games', icon: Ticket },
     { id: 'fleet', label: 'Fleet & Live Courts', icon: Video, badge: activeStreamsCount > 0 ? `${activeStreamsCount} Live` : undefined },
+    { id: 'recordings', label: 'Match Recordings', icon: Film },
   ];
 
   const handleSelectTab = (id: string) => {

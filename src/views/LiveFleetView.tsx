@@ -13,11 +13,13 @@ import {
   Wifi,
   WifiOff,
   AlertCircle,
+  Film,
 } from 'lucide-react';
 import { AdminApi } from '../services/api';
 import { SkeletonCardList } from '../components/Skeleton';
 import { LiveStreamModal } from '../components/LiveStreamModal';
 import { ConfigureCourtModal } from '../components/ConfigureCourtModal';
+import { ExtractRecordingModal } from '../components/ExtractRecordingModal';
 import {
   DiagnosticErrorModal,
   parseDiagnosticError,
@@ -37,6 +39,12 @@ export const LiveFleetView = () => {
     court: CourtCamera;
     venueName: string;
     playbackUrl: string;
+  } | null>(null);
+
+  // Extract Recording Modal state
+  const [extractModal, setExtractModal] = useState<{
+    court: CourtCamera;
+    venueName: string;
   } | null>(null);
 
   // Configure / Add Court Modal state
@@ -455,33 +463,55 @@ export const LiveFleetView = () => {
                             </button>
                           </div>
                         ) : isConfigured ? (
-                          /* CONFIGURED COURT: Start Stream & Settings buttons */
-                          <div style={{ display: 'flex', gap: 8 }}>
+                          /* CONFIGURED COURT: Start Stream, Fetch Video & Settings buttons */
+                          <div style={{ display: 'flex', gap: 6 }}>
                             <button
                               onClick={() => handleStartStream(court, venue)}
                               disabled={isActionLoading}
                               className="btn-primary"
                               style={{
                                 flex: 1,
-                                padding: '10px 14px',
-                                fontSize: '0.8rem',
+                                padding: '10px 10px',
+                                fontSize: '0.75rem',
                                 display: 'flex',
                                 alignItems: 'center',
                                 justifyContent: 'center',
-                                gap: 6,
+                                gap: 5,
                                 opacity: isActionLoading ? 0.7 : 1,
                               }}
                             >
                               {isActionLoading ? (
                                 <>
-                                  <RefreshCw size={14} className="spin" />
-                                  Starting Live Relay...
+                                  <RefreshCw size={13} className="spin" />
+                                  Starting...
                                 </>
                               ) : (
                                 <>
-                                  <Radio size={14} /> Start Live Stream
+                                  <Radio size={13} /> Live Stream
                                 </>
                               )}
+                            </button>
+
+                            <button
+                              onClick={() =>
+                                setExtractModal({
+                                  court,
+                                  venueName: venue.turfName,
+                                })
+                              }
+                              title="Fetch and test video recording extraction from Dahua NVR"
+                              className="btn-secondary"
+                              style={{
+                                padding: '10px 10px',
+                                fontSize: '0.75rem',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: 4,
+                                color: 'var(--accent-cyan)',
+                                borderColor: 'rgba(0, 229, 255, 0.3)',
+                              }}
+                            >
+                              <Film size={13} /> Fetch Video
                             </button>
 
                             <button
@@ -495,14 +525,14 @@ export const LiveFleetView = () => {
                               title="Edit Court Pi Gateway Base URL"
                               className="btn-secondary"
                               style={{
-                                padding: '10px 12px',
+                                padding: '10px 10px',
                                 fontSize: '0.75rem',
                                 display: 'flex',
                                 alignItems: 'center',
                                 justifyContent: 'center',
                               }}
                             >
-                              <Settings size={14} />
+                              <Settings size={13} />
                             </button>
                           </div>
                         ) : (
@@ -692,6 +722,15 @@ export const LiveFleetView = () => {
           }
         }}
       />
+
+      {/* Extract Recording Modal */}
+      {extractModal && (
+        <ExtractRecordingModal
+          court={extractModal.court}
+          venueName={extractModal.venueName}
+          onClose={() => setExtractModal(null)}
+        />
+      )}
     </div>
   );
 };

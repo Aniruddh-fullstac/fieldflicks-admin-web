@@ -226,4 +226,41 @@ export const AdminApi = {
     const res = await api.post('/recording/stop-live-stream', { cameraId });
     return extractData<any>(res);
   },
+
+  async getRecordings(params?: { page?: number; limit?: number; status?: string }): Promise<{
+    total: number;
+    page: number;
+    limit: number;
+    totalPages: number;
+    recordings: import('../types').AdminRecordingItem[];
+  }> {
+    const res = await api.get('/admin/recordings', { params });
+    return extractData<any>(res);
+  },
+
+  async triggerTestExtraction(data: {
+    cameraId: string;
+    durationMinutes?: number;
+    startTime?: string;
+    endTime?: string;
+  }): Promise<{
+    success: boolean;
+    cached: boolean;
+    recordingId: string;
+    status: string;
+    venueName: string;
+    courtName: string;
+    startTime: string;
+    endTime: string;
+    playableUrl?: string;
+    s3Path?: string;
+  }> {
+    const res = await api.post('/admin/recordings/test-extract', data);
+    return extractData<any>(res);
+  },
+
+  async getRecordingPlaybackUrl(id: string): Promise<{ playableUrl: string }> {
+    const res = await api.get(`/admin/recordings/${id}/playback-url`);
+    return extractData<any>(res);
+  },
 };

@@ -157,3 +157,22 @@ export interface VenueFleet {
   courtsCount: number;
   courts: CourtCamera[];
 }
+
+export interface AdminRecordingItem {
+  id: string;
+  venueName: string;
+  turfId?: string;
+  courtName: string;
+  courtNumber: number;
+  cameraId: string;
+  userName: string;
+  userPhone: string;
+  status: 'completed' | 'extracting' | 'uploaded' | 'failed' | 'in_progress' | string;
+  startTime: string;
+  endTime?: string;
+  durationMinutes?: number;
+  playableUrl?: string;
+  muxPlaybackId?: string;
+  s3Path?: string;
+  createdAt: string;
+}
