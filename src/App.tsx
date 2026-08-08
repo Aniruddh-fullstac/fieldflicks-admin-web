@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Sidebar } from './components/Sidebar';
 import { Header } from './components/Header';
 import { MobileBottomNav } from './components/MobileBottomNav';
@@ -7,11 +7,37 @@ import { UsersCrmView } from './views/UsersCrmView';
 import { TournamentsView } from './views/TournamentsView';
 import { CouponsView } from './views/CouponsView';
 import { LiveFleetView } from './views/LiveFleetView';
+import { WatchStreamView } from './views/WatchStreamView';
 
 export function App() {
   const [activeTab, setActiveTab] = useState('overview');
   const [searchTerm, setSearchTerm] = useState('');
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
+  const [watchStreamId, setWatchStreamId] = useState<string | null>(null);
+  const [watchStreamTitle, setWatchStreamTitle] = useState<string>('');
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const stream = params.get('stream');
+    const title = params.get('title');
+    if (stream) {
+      setWatchStreamId(stream);
+      if (title) setWatchStreamTitle(title);
+    }
+  }, []);
+
+  if (watchStreamId) {
+    return (
+      <WatchStreamView
+        playbackId={watchStreamId}
+        streamTitle={watchStreamTitle || 'FieldFlicks Court Live Stream'}
+        onBack={() => {
+          setWatchStreamId(null);
+          window.history.pushState({}, '', window.location.pathname);
+        }}
+      />
+    );
+  }
 
   const renderActiveView = () => {
     switch (activeTab) {
