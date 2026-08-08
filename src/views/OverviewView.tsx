@@ -216,15 +216,9 @@ export const OverviewView = () => {
   };
 
   return (
-    <div style={{ padding: 32, display: 'flex', flexDirection: 'column', gap: 28 }}>
+    <div className="view-padding" style={{ display: 'flex', flexDirection: 'column', gap: 28 }}>
       {/* 4 Primary KPI Cards */}
-      <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
-          gap: 20,
-        }}
-      >
+      <div className="stats-kpi-grid">
         {statCards.map((card, i) => {
           const Icon = card.icon;
           return (
@@ -250,14 +244,12 @@ export const OverviewView = () => {
               </div>
 
               <div style={{ marginTop: 14 }}>
-                <h3 style={{ fontSize: '1.75rem', fontWeight: 800, color: '#FFFFFF', letterSpacing: '-0.03em' }}>
+                <div style={{ fontSize: '1.6rem', fontWeight: 800, color: '#FFFFFF', letterSpacing: '-0.02em' }}>
                   {card.value}
-                </h3>
-                {card.subvalue && (
-                  <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: 2 }}>
-                    {card.subvalue}
-                  </div>
-                )}
+                </div>
+                <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: 4, display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <span>{card.subvalue}</span>
+                </div>
               </div>
 
               <div
@@ -269,11 +261,11 @@ export const OverviewView = () => {
                   alignItems: 'center',
                   gap: 6,
                   fontSize: '0.75rem',
-                  color: 'var(--primary-neon)',
+                  color: card.trend === 'up' ? 'var(--primary-neon)' : 'var(--text-dim)',
                   fontWeight: 600,
                 }}
               >
-                <TrendingUp size={14} />
+                <TrendingUp size={13} />
                 <span>{card.change}</span>
               </div>
             </div>
@@ -282,7 +274,7 @@ export const OverviewView = () => {
       </div>
 
       {/* Analytics Chart & Sports Breakdown Grid */}
-      <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 24 }}>
+      <div className="overview-charts-grid">
         {/* Interactive 30-Day Growth Chart */}
         <div className="glass-card" style={{ padding: 24 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20, flexWrap: 'wrap', gap: 12 }}>

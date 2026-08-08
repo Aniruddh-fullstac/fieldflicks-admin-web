@@ -126,7 +126,7 @@ export const LiveFleetView = () => {
   };
 
   return (
-    <div style={{ padding: 32, display: 'flex', flexDirection: 'column', gap: 24 }}>
+    <div className="view-padding" style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
       {/* Header and Controls */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 16 }}>
         <div>
@@ -223,7 +223,7 @@ export const LiveFleetView = () => {
               {/* Courts Grid */}
               <div style={{
                 display: 'grid',
-                gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))',
+                gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 280px), 1fr))',
                 gap: 16,
               }}>
                 {venue.courts.map((court) => {

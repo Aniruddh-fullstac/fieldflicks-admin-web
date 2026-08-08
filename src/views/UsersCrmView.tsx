@@ -164,7 +164,7 @@ export const UsersCrmView = () => {
   const endEntry = Math.min(currentPage * pageSize, totalCount);
 
   return (
-    <div style={{ padding: 32, display: 'flex', flexDirection: 'column', gap: 24 }}>
+    <div className="view-padding" style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
       {/* Search and Filters Header Card */}
       <div
         className="glass-card"
@@ -184,7 +184,7 @@ export const UsersCrmView = () => {
               alignItems: 'center',
               gap: 10,
               flex: 1,
-              minWidth: 320,
+              minWidth: 'min(300px, 100%)',
               maxWidth: 580,
             }}
           >
@@ -661,18 +661,18 @@ export const UsersCrmView = () => {
             justifyContent: 'center',
             alignItems: 'center',
             zIndex: 100,
-            padding: 24,
+            padding: 16,
           }}
         >
           <div
-            className="glass-card"
+            className="glass-card responsive-modal-content"
             style={{
               width: '100%',
               maxWidth: 920,
               maxHeight: '90vh',
               overflowY: 'auto',
               backgroundColor: '#0C1017',
-              padding: 32,
+              padding: 28,
               position: 'relative',
               border: '1px solid rgba(0, 230, 118, 0.3)',
               boxShadow: '0 20px 60px rgba(0, 0, 0, 0.7)',

@@ -85,9 +85,9 @@ export const CouponsView = () => {
   };
 
   return (
-    <div style={{ padding: 32, display: 'flex', flexDirection: 'column', gap: 24 }}>
+    <div className="view-padding" style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
       {/* Header Actions */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 16 }}>
         <div>
           <h3 style={{ fontSize: '1.2rem', fontWeight: 700, color: '#FFFFFF' }}>
             Discount Codes & Free Game Passes
@@ -97,7 +97,7 @@ export const CouponsView = () => {
           </p>
         </div>
 
-        <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+        <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
           <button onClick={fetchCoupons} className="btn-secondary" style={{ padding: '8px 12px', fontSize: '0.75rem' }}>
             <RefreshCw size={13} /> Refresh
           </button>
@@ -148,7 +148,7 @@ export const CouponsView = () => {
       ) : (
         <div style={{
           display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))',
+          gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 300px), 1fr))',
           gap: 20,
         }}>
           {coupons.map((c) => (
@@ -214,28 +214,35 @@ export const CouponsView = () => {
 
       {/* Create Coupon Modal */}
       {showCreateModal && (
-        <div style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          width: '100vw',
-          height: '100vh',
-          backgroundColor: 'rgba(0, 0, 0, 0.8)',
-          backdropFilter: 'blur(10px)',
-          display: 'flex',
-          justifyContent: 'center',
-          alignItems: 'center',
-          zIndex: 100,
-          padding: 24,
-        }}>
-          <div className="glass-card" style={{
-            width: '100%',
-            maxWidth: 500,
-            backgroundColor: '#0C1017',
-            padding: 32,
-            position: 'relative',
-            border: '1px solid rgba(0, 230, 118, 0.3)',
-          }}>
+        <div
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            width: '100vw',
+            height: '100vh',
+            backgroundColor: 'rgba(0, 0, 0, 0.8)',
+            backdropFilter: 'blur(12px)',
+            display: 'flex',
+            justifyContent: 'center',
+            alignItems: 'center',
+            zIndex: 100,
+            padding: 16,
+          }}
+        >
+          <div
+            className="glass-card responsive-modal-content"
+            style={{
+              width: '100%',
+              maxWidth: 500,
+              maxHeight: '90vh',
+              overflowY: 'auto',
+              backgroundColor: '#0C1017',
+              padding: 28,
+              position: 'relative',
+              border: '1px solid rgba(0, 230, 118, 0.3)',
+            }}
+          >
             <button
               onClick={() => setShowCreateModal(false)}
               style={{
@@ -356,30 +363,37 @@ export const CouponsView = () => {
         </div>
       )}
 
-      {/* Grant Free Pass Modal */}
+      {/* Issue Free Pass Modal */}
       {showGrantModal && (
-        <div style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          width: '100vw',
-          height: '100vh',
-          backgroundColor: 'rgba(0, 0, 0, 0.8)',
-          backdropFilter: 'blur(10px)',
-          display: 'flex',
-          justifyContent: 'center',
-          alignItems: 'center',
-          zIndex: 100,
-          padding: 24,
-        }}>
-          <div className="glass-card" style={{
-            width: '100%',
-            maxWidth: 480,
-            backgroundColor: '#0C1017',
-            padding: 32,
-            position: 'relative',
-            border: '1px solid rgba(0, 230, 118, 0.3)',
-          }}>
+        <div
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            width: '100vw',
+            height: '100vh',
+            backgroundColor: 'rgba(0, 0, 0, 0.8)',
+            backdropFilter: 'blur(12px)',
+            display: 'flex',
+            justifyContent: 'center',
+            alignItems: 'center',
+            zIndex: 100,
+            padding: 16,
+          }}
+        >
+          <div
+            className="glass-card responsive-modal-content"
+            style={{
+              width: '100%',
+              maxWidth: 480,
+              maxHeight: '90vh',
+              overflowY: 'auto',
+              backgroundColor: '#0C1017',
+              padding: 28,
+              position: 'relative',
+              border: '1px solid rgba(0, 230, 118, 0.3)',
+            }}
+          >
             <button
               onClick={() => setShowGrantModal(false)}
               style={{

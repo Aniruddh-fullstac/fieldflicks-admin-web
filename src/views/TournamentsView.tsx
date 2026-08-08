@@ -123,10 +123,10 @@ export const TournamentsView = () => {
   });
 
   return (
-    <div style={{ padding: 32, display: 'flex', flexDirection: 'column', gap: 24 }}>
+    <div className="view-padding" style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
       {/* Top Header & Actions */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 16 }}>
+        <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
           {/* Sport Filter */}
           <select
             value={filterSport}
@@ -212,8 +212,8 @@ export const TournamentsView = () => {
       ) : (
         <div style={{
           display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fill, minmax(360px, 1fr))',
-          gap: 24,
+          gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 300px), 1fr))',
+          gap: 20,
         }}>
           {filteredTournaments.map((t) => (
             <div key={t.id} className="glass-card" style={{ padding: 24, display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
@@ -340,28 +340,35 @@ export const TournamentsView = () => {
 
       {/* Create Tournament Modal */}
       {showCreateModal && (
-        <div style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          width: '100vw',
-          height: '100vh',
-          backgroundColor: 'rgba(0, 0, 0, 0.8)',
-          backdropFilter: 'blur(10px)',
-          display: 'flex',
-          justifyContent: 'center',
-          alignItems: 'center',
-          zIndex: 100,
-          padding: 24,
-        }}>
-          <div className="glass-card" style={{
-            width: '100%',
-            maxWidth: 640,
-            backgroundColor: '#0C1017',
-            padding: 32,
-            position: 'relative',
-            border: '1px solid rgba(0, 230, 118, 0.3)',
-          }}>
+        <div
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            width: '100vw',
+            height: '100vh',
+            backgroundColor: 'rgba(0, 0, 0, 0.8)',
+            backdropFilter: 'blur(12px)',
+            display: 'flex',
+            justifyContent: 'center',
+            alignItems: 'center',
+            zIndex: 100,
+            padding: 16,
+          }}
+        >
+          <div
+            className="glass-card responsive-modal-content"
+            style={{
+              width: '100%',
+              maxWidth: 640,
+              maxHeight: '90vh',
+              overflowY: 'auto',
+              backgroundColor: '#0C1017',
+              padding: 28,
+              position: 'relative',
+              border: '1px solid rgba(0, 230, 118, 0.3)',
+            }}
+          >
             <button
               onClick={() => setShowCreateModal(false)}
               style={{

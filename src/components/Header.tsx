@@ -1,4 +1,4 @@
-import { Search, Bell, Radio, UserCheck } from 'lucide-react';
+import { Search, Bell, Radio, UserCheck, Menu } from 'lucide-react';
 
 interface HeaderProps {
   title: string;
@@ -6,6 +6,7 @@ interface HeaderProps {
   searchTerm?: string;
   onSearchChange?: (val: string) => void;
   showSearch?: boolean;
+  onToggleMobileSidebar?: () => void;
 }
 
 export const Header = ({
@@ -14,49 +15,69 @@ export const Header = ({
   searchTerm,
   onSearchChange,
   showSearch = false,
+  onToggleMobileSidebar,
 }: HeaderProps) => {
   return (
-    <header style={{
-      height: 'var(--header-height)',
-      position: 'sticky',
-      top: 0,
-      backgroundColor: 'rgba(7, 9, 14, 0.85)',
-      backdropFilter: 'blur(16px)',
-      borderBottom: '1px solid var(--border-subtle)',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-      padding: '0 32px',
-      zIndex: 40,
-    }}>
-      <div>
-        <h2 style={{ fontSize: '1.35rem', fontWeight: 700, color: '#FFFFFF' }}>{title}</h2>
-        {subtitle && (
-          <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: 2 }}>{subtitle}</p>
-        )}
+    <header
+      className="header-container"
+      style={{
+        minHeight: 'var(--header-height)',
+        position: 'sticky',
+        top: 0,
+        backgroundColor: 'rgba(7, 9, 14, 0.88)',
+        backdropFilter: 'blur(16px)',
+        WebkitBackdropFilter: 'blur(16px)',
+        borderBottom: '1px solid var(--border-subtle)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        padding: '12px 24px',
+        zIndex: 40,
+        gap: 16,
+        flexWrap: 'wrap',
+      }}
+    >
+      <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+        {/* Mobile Hamburger Menu Toggle */}
+        <button
+          onClick={onToggleMobileSidebar}
+          className="mobile-hamburger-btn"
+          aria-label="Open navigation menu"
+        >
+          <Menu size={20} />
+        </button>
+
+        <div>
+          <h2 style={{ fontSize: '1.25rem', fontWeight: 700, color: '#FFFFFF', letterSpacing: '-0.02em' }}>{title}</h2>
+          {subtitle && (
+            <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: 2 }}>{subtitle}</p>
+          )}
+        </div>
       </div>
 
-      <div style={{ display: 'flex', alignItems: 'center', gap: 20 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
         {showSearch && onSearchChange && (
           <div style={{
             position: 'relative',
             display: 'flex',
             alignItems: 'center',
+            minWidth: 200,
+            maxWidth: '100%',
           }}>
             <Search size={16} color="var(--text-dim)" style={{ position: 'absolute', left: 12 }} />
             <input
               type="text"
-              placeholder="Search athletes, phone, turf, tournament..."
+              placeholder="Search athletes, phone, turf..."
               value={searchTerm || ''}
               onChange={(e) => onSearchChange(e.target.value)}
               style={{
-                width: 300,
+                width: '100%',
                 backgroundColor: 'rgba(255, 255, 255, 0.05)',
                 border: '1px solid var(--border-subtle)',
                 borderRadius: 'var(--radius-sm)',
-                padding: '8px 12px 8px 36px',
+                padding: '7px 12px 7px 36px',
                 color: '#FFFFFF',
-                fontSize: '0.85rem',
+                fontSize: '0.82rem',
                 outline: 'none',
                 transition: 'border 0.2s ease',
               }}
@@ -65,14 +86,14 @@ export const Header = ({
         )}
 
         {/* Live Broadcast Indicator */}
-        <div className="badge-neon green" style={{ padding: '6px 12px', fontSize: '0.75rem', gap: 6 }}>
-          <Radio size={14} /> System Operational
+        <div className="badge-neon green" style={{ padding: '6px 10px', fontSize: '0.7rem', gap: 6, whiteSpace: 'nowrap' }}>
+          <Radio size={12} /> System Online
         </div>
 
         {/* Notification Bell */}
         <button style={{
-          width: 38,
-          height: 38,
+          width: 36,
+          height: 36,
           borderRadius: 'var(--radius-sm)',
           backgroundColor: 'rgba(255, 255, 255, 0.05)',
           border: '1px solid var(--border-subtle)',
@@ -81,23 +102,24 @@ export const Header = ({
           justifyContent: 'center',
           cursor: 'pointer',
           color: 'var(--text-muted)',
+          flexShrink: 0,
         }}>
-          <Bell size={18} />
+          <Bell size={16} />
         </button>
 
         {/* Admin Profile */}
-        <div style={{
+        <div className="header-actions-group" style={{
           display: 'flex',
           alignItems: 'center',
-          gap: 10,
-          padding: '6px 12px',
+          gap: 8,
+          padding: '4px 10px',
           backgroundColor: 'rgba(255, 255, 255, 0.04)',
           borderRadius: 'var(--radius-md)',
           border: '1px solid var(--border-subtle)',
         }}>
           <div style={{
-            width: 30,
-            height: 30,
+            width: 28,
+            height: 28,
             borderRadius: '50%',
             backgroundColor: 'var(--primary-neon)',
             color: '#07090E',
@@ -105,12 +127,12 @@ export const Header = ({
             alignItems: 'center',
             justifyContent: 'center',
             fontWeight: 700,
-            fontSize: '0.8rem',
+            fontSize: '0.75rem',
           }}>
-            <UserCheck size={16} />
+            <UserCheck size={14} />
           </div>
           <div>
-            <div style={{ fontSize: '0.8rem', fontWeight: 600, color: '#FFFFFF' }}>Master Admin</div>
+            <div style={{ fontSize: '0.75rem', fontWeight: 600, color: '#FFFFFF' }}>Master Admin</div>
             <div style={{ fontSize: '0.65rem', color: 'var(--primary-neon)' }}>Superuser</div>
           </div>
         </div>
