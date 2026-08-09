@@ -69,6 +69,7 @@ export const NotificationsView = () => {
         body,
         targetAudience,
         specificNumber: targetAudience === 'SPECIFIC_NUMBER' ? specificNumber : undefined,
+        channels,
       });
 
       const targetLabel = targetAudience === 'SPECIFIC_NUMBER' ? `Athlete (${specificNumber})` : 'All Athletes';

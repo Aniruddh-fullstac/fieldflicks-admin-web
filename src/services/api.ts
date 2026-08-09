@@ -349,6 +349,7 @@ export const AdminApi = {
     body: string;
     targetAudience: string;
     specificNumber?: string;
+    channels?: string[];
   }): Promise<{ success: boolean; recipientCount: number }> {
     const res = await api.post('/admin/notifications/broadcast', data);
     return extractData<any>(res);
