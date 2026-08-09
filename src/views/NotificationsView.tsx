@@ -428,21 +428,30 @@ export const NotificationsView = () => {
 
             <button
               type="submit"
-              className="btn-primary"
+              disabled={sending}
               style={{
-                marginTop: 8,
-                padding: '12px 20px',
-                borderRadius: 'var(--radius-md)',
+                width: '100%',
+                background: sending ? 'rgba(0,230,118,0.5)' : 'var(--primary-neon)',
+                color: '#000',
+                fontSize: '1rem',
                 fontWeight: 800,
-                fontSize: '0.9rem',
+                padding: '14px',
+                borderRadius: 'var(--radius-md)',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
                 gap: 8,
+                marginTop: 8,
+                border: 'none',
+                cursor: sending ? 'not-allowed' : 'pointer',
               }}
             >
-              <Send size={18} />
-              {deliveryMode === 'NOW' ? 'Broadcast Campaign Now' : 'Schedule Broadcast'}
+              {sending ? 'Dispatching...' : (
+                <>
+                  <Zap size={18} />
+                  {deliveryMode === 'NOW' ? 'Dispatch Broadcast Now' : 'Schedule Campaign'}
+                </>
+              )}
             </button>
           </form>
         </div>
