@@ -34,56 +34,73 @@ export const NotificationsView = () => {
   const [smsSelected, setSmsSelected] = useState(false);
   const [inAppSelected, setInAppSelected] = useState(true);
   const [targetAudience, setTargetAudience] = useState('ALL_USERS');
+  const [specificNumber, setSpecificNumber] = useState('');
   const [deepLink, setDeepLink] = useState('fieldflicks://tournaments');
   const [deliveryMode, setDeliveryMode] = useState<'NOW' | 'SCHEDULE'>('NOW');
   const [scheduleDateTime, setScheduleDateTime] = useState('2026-08-10T18:00');
   const [toastMsg, setToastMsg] = useState<string | null>(null);
+  const [sending, setSending] = useState(false);
 
   const showToast = (msg: string) => {
     setToastMsg(msg);
     setTimeout(() => setToastMsg(null), 3500);
   };
 
-  const handleSendCampaign = (e: React.FormEvent) => {
+  const handleSendCampaign = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!title || !body) return;
+    if (targetAudience === 'SPECIFIC_NUMBER' && specificNumber.length < 10) {
+      showToast('⚠️ Please enter a valid 10-digit number');
+      return;
+    }
+
+    setSending(true);
 
     const channels: ('PUSH' | 'SMS' | 'IN_APP')[] = [];
     if (pushSelected) channels.push('PUSH');
     if (smsSelected) channels.push('SMS');
     if (inAppSelected) channels.push('IN_APP');
 
-    const audienceLabels: Record<string, { label: string; count: number }> = {
-      ALL_USERS: { label: 'All Registered Athletes', count: 4850 },
-      ACTIVE_7D: { label: 'Active Athletes (Last 7 Days)', count: 2150 },
-      INACTIVE_30D: { label: 'Inactive Athletes (30+ Days)', count: 1200 },
-      TOURNAMENT_PLAYERS: { label: 'Tournament Participants', count: 850 },
-      TURF_MANAGERS: { label: 'Turf Owners & Managers', count: 45 },
-    };
+    try {
+      // Import AdminApi at top level if not present, but assuming it is or we'll add it
+      const { AdminApi } = await import('../services/api');
+      const res = await AdminApi.broadcastNotification({
+        title,
+        body,
+        targetAudience,
+        specificNumber: targetAudience === 'SPECIFIC_NUMBER' ? specificNumber : undefined,
+      });
 
-    const targetInfo = audienceLabels[targetAudience] || { label: 'Selected Audience', count: 500 };
+      const targetLabel = targetAudience === 'SPECIFIC_NUMBER' ? `Athlete (${specificNumber})` : 'All Athletes';
 
-    const newCampaign: NotificationCampaign = {
-      id: `camp-${Date.now().toString().slice(-4)}`,
-      title,
-      body,
-      channels,
-      targetAudience: targetInfo.label,
-      recipientCount: targetInfo.count,
-      status: deliveryMode === 'NOW' ? 'DELIVERED' : 'SCHEDULED',
-      scheduledTime: deliveryMode === 'SCHEDULE' ? scheduleDateTime : undefined,
-      openRatePercent: deliveryMode === 'NOW' ? 0 : undefined,
-      createdAt: new Date().toISOString().replace('T', ' ').slice(0, 16),
-    };
+      const newCampaign: NotificationCampaign = {
+        id: `camp-${Date.now().toString().slice(-4)}`,
+        title,
+        body,
+        channels,
+        targetAudience: targetLabel,
+        recipientCount: res.recipientCount,
+        status: deliveryMode === 'NOW' ? 'DELIVERED' : 'SCHEDULED',
+        scheduledTime: deliveryMode === 'SCHEDULE' ? scheduleDateTime : undefined,
+        openRatePercent: deliveryMode === 'NOW' ? 0 : undefined,
+        createdAt: new Date().toISOString().replace('T', ' ').slice(0, 16),
+      };
 
-    setCampaigns([newCampaign, ...campaigns]);
-    setTitle('');
-    setBody('');
-    showToast(
-      deliveryMode === 'NOW'
-        ? `🚀 Notification broadcast dispatched to ${targetInfo.count} athletes!`
-        : `⏰ Campaign scheduled for ${scheduleDateTime} to ${targetInfo.count} athletes!`
-    );
+      setCampaigns([newCampaign, ...campaigns]);
+      setTitle('');
+      setBody('');
+      setSpecificNumber('');
+      showToast(
+        deliveryMode === 'NOW'
+          ? `🚀 Notification broadcast dispatched to ${res.recipientCount} athletes!`
+          : `⏰ Campaign scheduled for ${scheduleDateTime} to ${targetLabel}!`
+      );
+    } catch (err: any) {
+      console.error('Failed to broadcast:', err);
+      showToast(`⚠️ Failed to send: ${err.message || 'Unknown error'}`);
+    } finally {
+      setSending(false);
+    }
   };
 
   return (
@@ -237,14 +254,33 @@ export const NotificationsView = () => {
                   padding: '10px 14px',
                   color: '#FFF',
                   fontSize: '0.85rem',
+                  marginBottom: targetAudience === 'SPECIFIC_NUMBER' ? 12 : 0,
                 }}
               >
-                <option value="ALL_USERS">All Registered Athletes (4,850 Athletes)</option>
-                <option value="ACTIVE_7D">Active Athletes in Last 7 Days (2,150 Athletes)</option>
-                <option value="INACTIVE_30D">Inactive Athletes (30+ Days) — Winback Segment (1,200 Athletes)</option>
-                <option value="TOURNAMENT_PLAYERS">Tournament & League Participants (850 Athletes)</option>
-                <option value="TURF_MANAGERS">Turf Owners & Operations Managers (45 Venues)</option>
+                <option value="ALL_USERS">All Registered Athletes</option>
+                <option value="SPECIFIC_NUMBER">Specific Athlete (Phone Number)</option>
               </select>
+
+              {targetAudience === 'SPECIFIC_NUMBER' && (
+                <div style={{ position: 'relative' }}>
+                  <input
+                    type="text"
+                    placeholder="Enter 10-digit mobile number"
+                    value={specificNumber}
+                    onChange={(e) => setSpecificNumber(e.target.value.replace(/\D/g, '').slice(0, 10))}
+                    style={{
+                      width: '100%',
+                      background: 'rgba(255,255,255,0.03)',
+                      border: '1px solid var(--border-subtle)',
+                      borderRadius: 'var(--radius-md)',
+                      padding: '10px 14px 10px 38px',
+                      color: '#FFF',
+                      fontSize: '0.9rem',
+                    }}
+                  />
+                  <Smartphone size={16} color="var(--text-muted)" style={{ position: 'absolute', left: 12, top: 12 }} />
+                </div>
+              )}
             </div>
 
             {/* Title */}

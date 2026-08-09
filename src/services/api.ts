@@ -339,4 +339,16 @@ export const AdminApi = {
     const res = await api.patch(`/points/configs/${eventType}`, data);
     return extractData<any>(res);
   },
+
+  // 8. Notifications & Broadcast Campaigns
+  async broadcastNotification(data: {
+    title: string;
+    body: string;
+    targetAudience: string;
+    specificNumber?: string;
+  }): Promise<{ success: boolean; recipientCount: number }> {
+    const res = await api.post('/admin/notifications/broadcast', data);
+    return extractData<any>(res);
+  },
 };
+
