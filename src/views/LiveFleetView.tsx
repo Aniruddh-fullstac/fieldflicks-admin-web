@@ -493,6 +493,24 @@ export const LiveFleetView = () => {
                             </button>
 
                             <button
+                              onClick={() => handleStopStream(court, venue.turfName)}
+                              disabled={isActionLoading}
+                              className="btn-secondary"
+                              title="Force Stop Stalled Stream"
+                              style={{
+                                padding: '10px 10px',
+                                color: 'var(--accent-crimson)',
+                                borderColor: 'rgba(255, 61, 87, 0.4)',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                opacity: isActionLoading ? 0.6 : 1,
+                              }}
+                            >
+                              <Square size={13} fill="currentColor" />
+                            </button>
+
+                            <button
                               onClick={() =>
                                 setExtractModal({
                                   court,
