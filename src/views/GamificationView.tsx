@@ -154,6 +154,23 @@ export const GamificationView = () => {
         </div>
       </div>
 
+      {error && (
+        <div style={{
+          padding: 16,
+          backgroundColor: 'rgba(255, 61, 87, 0.1)',
+          border: '1px solid var(--accent-crimson)',
+          borderRadius: 'var(--radius-sm)',
+          color: 'var(--accent-crimson)',
+          display: 'flex',
+          alignItems: 'center',
+          gap: 10,
+          fontSize: '0.85rem',
+        }}>
+          <AlertTriangle size={18} />
+          <span>{error}</span>
+        </div>
+      )}
+
       {/* Section 1: XP Reward Trigger Rules */}
       <div className="glass-card" style={{ padding: 24, display: 'flex', flexDirection: 'column', gap: 16 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
