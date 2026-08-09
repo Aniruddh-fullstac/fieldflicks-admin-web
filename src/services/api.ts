@@ -320,6 +320,9 @@ export const AdminApi = {
   async getLeaderboard(period = 'all', limit = 50): Promise<any[]> {
     const res = await api.get('/points/leaderboard', { params: { period, limit } });
     const raw = extractData<any>(res);
+    if (raw && Array.isArray(raw.rows)) {
+      return raw.rows;
+    }
     return Array.isArray(raw) ? raw : [];
   },
 
