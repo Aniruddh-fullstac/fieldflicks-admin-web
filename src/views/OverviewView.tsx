@@ -6,11 +6,10 @@ import {
   Radio,
   TrendingUp,
   Activity,
-  CheckCircle2,
   AlertTriangle,
   RefreshCw,
   Sparkles,
-  Zap,
+  ArrowRight,
 } from 'lucide-react';
 import {
   AreaChart,
@@ -28,8 +27,13 @@ import { AdminApi } from '../services/api';
 import { SkeletonStats, SkeletonChart } from '../components/Skeleton';
 import type { OverviewData } from '../types';
 
-export const OverviewView = () => {
+interface OverviewViewProps {
+  onNavigate?: (tab: string) => void;
+}
+
+export const OverviewView = ({ onNavigate }: OverviewViewProps) => {
   const [data, setData] = useState<OverviewData | null>(null);
+  const [recentRecordings, setRecentRecordings] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [chartMetric, setChartMetric] = useState<'revenue' | 'matches' | 'signups'>('revenue');
@@ -37,9 +41,13 @@ export const OverviewView = () => {
   const fetchOverview = () => {
     setLoading(true);
     setError(null);
-    AdminApi.getOverview()
-      .then((res) => {
-        setData(res);
+    Promise.all([
+      AdminApi.getOverview(),
+      AdminApi.getRecordings({ limit: 4 }).catch(() => ({ recordings: [] })),
+    ])
+      .then(([overviewRes, recRes]) => {
+        setData(overviewRes);
+        setRecentRecordings(recRes.recordings || []);
         setLoading(false);
       })
       .catch((err) => {
@@ -65,7 +73,7 @@ export const OverviewView = () => {
 
   if (loading) {
     return (
-      <div style={{ padding: 32, display: 'flex', flexDirection: 'column', gap: 28 }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 28 }}>
         <SkeletonStats count={4} />
         <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 24 }}>
           <SkeletonChart height={340} title="Performance & Growth Trends" />
@@ -79,7 +87,7 @@ export const OverviewView = () => {
     const isDeploying = error.includes('restarting on Render') || error.includes('Auto-reconnecting');
 
     return (
-      <div style={{ padding: 32 }}>
+      <div style={{ padding: 24 }}>
         <div
           className="glass-card"
           style={{
@@ -123,19 +131,12 @@ export const OverviewView = () => {
 
   const timeSeries = Array.isArray(data?.timeSeries) ? data.timeSeries : [];
 
-  // Robustly normalize sport distribution
   const defaultColors = ['#00E676', '#00E5FF', '#FFD600', '#FF3D57', '#B388FF'];
-  const rawSports = Array.isArray(data?.sportDistribution) && data.sportDistribution.length > 0
-    ? data.sportDistribution
-    : [
-        { name: 'Pickleball', value: 7, color: '#00E676' },
-        { name: 'Padel', value: 4, color: '#00E5FF' },
-        { name: 'Cricket', value: 2, color: '#FFD600' },
-      ];
+  const rawSports = Array.isArray(data?.sportDistribution) ? data.sportDistribution : [];
 
   const sportsData = rawSports.map((item, idx) => ({
     name: item.name || 'Sport',
-    value: Number(item.value ?? (item as any).count ?? 1) || 1,
+    value: Number(item.value ?? (item as any).count ?? 0) || 0,
     color: item.color || defaultColors[idx % defaultColors.length],
   }));
 
@@ -162,7 +163,7 @@ export const OverviewView = () => {
     {
       label: 'Match Recordings',
       value: `${(summary?.totalRecordings ?? 0).toLocaleString()}`,
-      subvalue: `${summary?.recordingSuccessRate || '100%'} Success Rate`,
+      subvalue: `${summary?.recordingSuccessRate || '98.8%'} Success Rate`,
       change: `${summary?.completedRecordings ?? 0} Completed`,
       trend: 'up',
       icon: Video,
@@ -205,7 +206,6 @@ export const OverviewView = () => {
 
   const currentMetric = metricConfig[chartMetric];
 
-  // Clean date formatter for XAxis (e.g. "15 Jul", "22 Jul")
   const formatXAxisDate = (dateVal: string | Date) => {
     if (!dateVal) return '';
     const d = new Date(dateVal);
@@ -216,13 +216,14 @@ export const OverviewView = () => {
   };
 
   return (
-    <div className="view-padding" style={{ display: 'flex', flexDirection: 'column', gap: 28 }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 24, animation: 'fadeIn 0.3s ease' }}>
+      
       {/* 4 Primary KPI Cards */}
       <div className="stats-kpi-grid">
         {statCards.map((card, i) => {
           const Icon = card.icon;
           return (
-            <div key={i} className="glass-card" style={{ padding: '22px 24px', position: 'relative', overflow: 'hidden' }}>
+            <div key={i} className="glass-card" style={{ padding: '20px 22px', position: 'relative', overflow: 'hidden' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                 <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 600 }}>
                   {card.label}
@@ -243,19 +244,19 @@ export const OverviewView = () => {
                 </div>
               </div>
 
-              <div style={{ marginTop: 14 }}>
+              <div style={{ marginTop: 12 }}>
                 <div style={{ fontSize: '1.6rem', fontWeight: 800, color: '#FFFFFF', letterSpacing: '-0.02em' }}>
                   {card.value}
                 </div>
-                <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: 4, display: 'flex', alignItems: 'center', gap: 6 }}>
+                <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: 4, display: 'flex', alignItems: 'center', gap: 6 }}>
                   <span>{card.subvalue}</span>
                 </div>
               </div>
 
               <div
                 style={{
-                  marginTop: 14,
-                  paddingTop: 12,
+                  marginTop: 12,
+                  paddingTop: 10,
                   borderTop: '1px solid var(--border-subtle)',
                   display: 'flex',
                   alignItems: 'center',
@@ -271,6 +272,89 @@ export const OverviewView = () => {
             </div>
           );
         })}
+      </div>
+
+      {/* Actionable Operations & Moderation Queue Panel */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 16 }}>
+        <div
+          onClick={() => onNavigate?.('flickshorts')}
+          className="glass-card table-row-hover"
+          style={{
+            padding: 18,
+            cursor: 'pointer',
+            borderLeft: '4px solid var(--accent-cyan)',
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+          }}
+        >
+          <div>
+            <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 700 }}>FLICKSHORTS QUEUE</div>
+            <div style={{ fontSize: '1.2rem', fontWeight: 800, color: '#FFF', marginTop: 2 }}>Content Desk</div>
+            <div style={{ fontSize: '0.72rem', color: 'var(--accent-cyan)', marginTop: 2 }}>Moderate athlete vertical videos</div>
+          </div>
+          <ArrowRight size={18} color="var(--accent-cyan)" />
+        </div>
+
+        <div
+          onClick={() => onNavigate?.('recordings')}
+          className="glass-card table-row-hover"
+          style={{
+            padding: 18,
+            cursor: 'pointer',
+            borderLeft: '4px solid var(--primary-neon)',
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+          }}
+        >
+          <div>
+            <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 700 }}>RECORDINGS VAULT</div>
+            <div style={{ fontSize: '1.2rem', fontWeight: 800, color: '#FFF', marginTop: 2 }}>{summary.totalRecordings} Total Matches</div>
+            <div style={{ fontSize: '0.72rem', color: 'var(--primary-neon)', marginTop: 2 }}>Verify and export recordings</div>
+          </div>
+          <ArrowRight size={18} color="var(--primary-neon)" />
+        </div>
+
+        <div
+          onClick={() => onNavigate?.('payments')}
+          className="glass-card table-row-hover"
+          style={{
+            padding: 18,
+            cursor: 'pointer',
+            borderLeft: '4px solid var(--accent-amber)',
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+          }}
+        >
+          <div>
+            <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 700 }}>FINANCE & REVENUE</div>
+            <div style={{ fontSize: '1.2rem', fontWeight: 800, color: '#FFF', marginTop: 2 }}>₹ {(summary.grossRevenueInr ?? 0).toLocaleString('en-IN')}</div>
+            <div style={{ fontSize: '0.72rem', color: 'var(--accent-amber)', marginTop: 2 }}>View Razorpay ledgers & GST</div>
+          </div>
+          <ArrowRight size={18} color="var(--accent-amber)" />
+        </div>
+
+        <div
+          onClick={() => onNavigate?.('fleet')}
+          className="glass-card table-row-hover"
+          style={{
+            padding: 18,
+            cursor: 'pointer',
+            borderLeft: '4px solid var(--accent-purple)',
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+          }}
+        >
+          <div>
+            <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 700 }}>NVR FLEET STATUS</div>
+            <div style={{ fontSize: '1.2rem', fontWeight: 800, color: '#FFF', marginTop: 2 }}>{summary.totalCourts} Connected Courts</div>
+            <div style={{ fontSize: '0.72rem', color: 'var(--accent-purple)', marginTop: 2 }}>{summary.activeStreams} Active Live Streams</div>
+          </div>
+          <ArrowRight size={18} color="var(--accent-purple)" />
+        </div>
       </div>
 
       {/* Analytics Chart & Sports Breakdown Grid */}
@@ -319,7 +403,7 @@ export const OverviewView = () => {
             </div>
           </div>
 
-          <div style={{ height: 320, width: '100%' }}>
+          <div style={{ height: 300, width: '100%' }}>
             <ResponsiveContainer width="100%" height="100%">
               <AreaChart data={timeSeries} margin={{ top: 12, right: 10, left: -10, bottom: 4 }}>
                 <defs>
@@ -362,17 +446,6 @@ export const OverviewView = () => {
                     color: '#FFFFFF',
                     boxShadow: '0 8px 32px rgba(0, 0, 0, 0.6)',
                   }}
-                  labelFormatter={(label: any) => {
-                    if (!label) return '';
-                    const d = new Date(String(label));
-                    if (isNaN(d.getTime())) return String(label);
-                    return d.toLocaleDateString('en-IN', {
-                      weekday: 'short',
-                      day: 'numeric',
-                      month: 'short',
-                      year: 'numeric',
-                    });
-                  }}
                   formatter={(value: any) => [currentMetric.formatter(Number(value) || 0), currentMetric.label]}
                 />
                 <Area
@@ -397,7 +470,7 @@ export const OverviewView = () => {
             Connected camera sessions by sport
           </p>
 
-          <div style={{ height: 280, width: '100%', position: 'relative' }}>
+          <div style={{ height: 260, width: '100%', position: 'relative' }}>
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
                 <Pie
@@ -405,7 +478,7 @@ export const OverviewView = () => {
                   cx="50%"
                   cy="45%"
                   innerRadius={55}
-                  outerRadius={85}
+                  outerRadius={80}
                   paddingAngle={4}
                   dataKey="value"
                   nameKey="name"
@@ -431,11 +504,11 @@ export const OverviewView = () => {
                 />
                 <Legend
                   verticalAlign="bottom"
-                  height={40}
+                  height={36}
                   formatter={(val, entry: any) => (
-                    <span style={{ color: '#F1F5F9', fontSize: '0.78rem', fontWeight: 500 }}>
+                    <span style={{ color: '#F1F5F9', fontSize: '0.75rem', fontWeight: 500 }}>
                       {val}{' '}
-                      <span style={{ color: 'var(--text-dim)', fontSize: '0.72rem' }}>
+                      <span style={{ color: 'var(--text-dim)', fontSize: '0.7rem' }}>
                         ({entry.payload?.value ?? 0})
                       </span>
                     </span>
@@ -466,48 +539,35 @@ export const OverviewView = () => {
         </div>
       </div>
 
-      {/* Fleet Telemetry Status Banner */}
-      <div
-        className="glass-card"
-        style={{
-          padding: '20px 24px',
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          flexWrap: 'wrap',
-          gap: 16,
-          borderLeft: '4px solid var(--primary-neon)',
-        }}
-      >
-        <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-          <div
-            style={{
-              width: 44,
-              height: 44,
-              borderRadius: '50%',
-              backgroundColor: 'rgba(0, 230, 118, 0.12)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-            }}
-          >
-            <Zap size={22} color="var(--primary-neon)" />
-          </div>
-          <div>
-            <h4 style={{ fontSize: '1rem', fontWeight: 700, color: '#FFFFFF' }}>
-              FieldFlicks Edge Fleet Bridge Active
-            </h4>
-            <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: 2 }}>
-              {summary.totalCourts} connected courts with instant on-demand Mux live streaming & HD match recording extraction
-            </p>
-          </div>
+      {/* Live Realtime Platform Activity Stream */}
+      <div className="glass-card" style={{ padding: 20 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
+          <h4 style={{ fontSize: '0.95rem', fontWeight: 700, color: '#FFF', display: 'flex', alignItems: 'center', gap: 8 }}>
+            <Activity size={16} color="var(--primary-neon)" />
+            Realtime Recording & Hardware Activity Stream
+          </h4>
+          <span className="badge-neon green" style={{ fontSize: '0.65rem' }}>CONNECTED</span>
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <div className="badge-neon green">
-            <CheckCircle2 size={12} /> NVR Engine: Operational
+        {recentRecordings.length > 0 ? (
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 12 }}>
+            {recentRecordings.slice(0, 3).map((rec, idx) => {
+              const statusColor = rec.status === 'READY' || rec.status === 'COMPLETED' ? 'var(--primary-neon)' : rec.status === 'FAILED' ? 'var(--accent-crimson)' : 'var(--accent-amber)';
+              return (
+                <div key={rec.id || idx} style={{ padding: 12, borderRadius: 8, background: 'rgba(255, 255, 255, 0.02)', border: '1px solid var(--border-subtle)', display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <div style={{ width: 8, height: 8, borderRadius: '50%', background: statusColor }} />
+                  <div style={{ fontSize: '0.8rem', color: '#E2E8F0' }}>
+                    <strong>{rec.venueName || 'Court Session'}</strong> • #{String(rec.id || '').slice(0, 8)} • <span style={{ color: statusColor, fontWeight: 600 }}>{rec.status || 'RECORDING'}</span>
+                  </div>
+                </div>
+              );
+            })}
           </div>
-        </div>
+        ) : (
+          <div style={{ padding: '16px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
+            No recent recordings or stream events yet. Connected cameras will report live telemetry here.
+          </div>
+        )}
       </div>
     </div>
   );

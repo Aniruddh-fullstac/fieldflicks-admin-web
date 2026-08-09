@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react';
 import { Sidebar } from './components/Sidebar';
 import { Header } from './components/Header';
 import { MobileBottomNav } from './components/MobileBottomNav';
+
+// Views
 import { OverviewView } from './views/OverviewView';
 import { UsersCrmView } from './views/UsersCrmView';
 import { TournamentsView } from './views/TournamentsView';
@@ -9,6 +11,16 @@ import { CouponsView } from './views/CouponsView';
 import { LiveFleetView } from './views/LiveFleetView';
 import { WatchStreamView } from './views/WatchStreamView';
 import { RecordingsVaultView } from './views/RecordingsVaultView';
+import { FlickShortsView } from './views/FlickShortsView';
+import { PaymentsView } from './views/PaymentsView';
+import { PricingView } from './views/PricingView';
+import { NotificationsView } from './views/NotificationsView';
+import { GamificationView } from './views/GamificationView';
+import { LeaderboardView } from './views/LeaderboardView';
+import { AdsView } from './views/AdsView';
+import { ReportsView } from './views/ReportsView';
+import { CmsView } from './views/CmsView';
+import { SettingsView } from './views/SettingsView';
 
 export function App() {
   const [activeTab, setActiveTab] = useState('overview');
@@ -43,19 +55,39 @@ export function App() {
   const renderActiveView = () => {
     switch (activeTab) {
       case 'overview':
-        return <OverviewView />;
-      case 'users':
-        return <UsersCrmView />;
-      case 'tournaments':
-        return <TournamentsView />;
-      case 'coupons':
-        return <CouponsView />;
+        return <OverviewView onNavigate={(tab) => setActiveTab(tab)} />;
       case 'fleet':
         return <LiveFleetView />;
       case 'recordings':
         return <RecordingsVaultView />;
+      case 'flickshorts':
+        return <FlickShortsView />;
+      case 'users':
+        return <UsersCrmView />;
+      case 'gamification':
+        return <GamificationView />;
+      case 'leaderboard':
+        return <LeaderboardView />;
+      case 'notifications':
+        return <NotificationsView />;
+      case 'tournaments':
+        return <TournamentsView />;
+      case 'coupons':
+        return <CouponsView />;
+      case 'payments':
+        return <PaymentsView />;
+      case 'pricing':
+        return <PricingView />;
+      case 'ads':
+        return <AdsView />;
+      case 'reports':
+        return <ReportsView />;
+      case 'cms':
+        return <CmsView />;
+      case 'settings':
+        return <SettingsView />;
       default:
-        return <OverviewView />;
+        return <OverviewView onNavigate={(tab) => setActiveTab(tab)} />;
     }
   };
 
@@ -63,13 +95,43 @@ export function App() {
     switch (activeTab) {
       case 'overview':
         return {
-          title: 'Analytics & Trends',
-          subtitle: 'Live platform revenue, athlete engagement, and recording health',
+          title: 'Analytics & Platform KPIs',
+          subtitle: 'Live platform revenue, athlete engagement, and camera fleet health',
+        };
+      case 'fleet':
+        return {
+          title: 'Fleet & NVR Cameras',
+          subtitle: 'Edge NVR cameras, RTSP streams, and on-demand Mux broadcast control',
+        };
+      case 'recordings':
+        return {
+          title: 'Match Recordings Vault & AI Highlights',
+          subtitle: '7-stage extraction pipeline, AI moments verification, and 4K raw downloads',
+        };
+      case 'flickshorts':
+        return {
+          title: 'FlickShorts Moderation Desk',
+          subtitle: 'Approve, reject, or feature 9:16 vertical athlete viral reels & clips',
         };
       case 'users':
         return {
           title: 'Athlete CRM & Utility',
           subtitle: 'Detailed athlete profiles, recorded match history, and free passes',
+        };
+      case 'gamification':
+        return {
+          title: 'Gamification & XP Points Engine',
+          subtitle: 'Configure XP point rules, milestone levels, perks, and manual adjustments',
+        };
+      case 'leaderboard':
+        return {
+          title: 'Multi-Sport Leaderboards',
+          subtitle: 'Athletes ranking engine, weekly/monthly cycle resets, and podium coupon awards',
+        };
+      case 'notifications':
+        return {
+          title: 'Broadcast Notifications & Campaigns',
+          subtitle: 'Targeted Push (FCM), SMS (MSG91), and in-app banner announcements',
         };
       case 'tournaments':
         return {
@@ -78,21 +140,41 @@ export function App() {
         };
       case 'coupons':
         return {
-          title: 'Coupons & Free Passes',
+          title: 'Coupons & Free Game Grants',
           subtitle: 'Configure discount codes, VIP passes, and complimentary games',
         };
-      case 'fleet':
+      case 'payments':
         return {
-          title: 'Fleet & Live Courts',
-          subtitle: 'Edge NVR cameras, RTSP streams, and on-demand Mux broadcast control',
+          title: 'Payments, Settlements & Refunds',
+          subtitle: 'Razorpay gross transaction ledger, refund desk, and GST invoice previews',
         };
-      case 'recordings':
+      case 'pricing':
         return {
-          title: 'Match Recordings Vault',
-          subtitle: 'Browse, test NVR video extraction, and watch match footage',
+          title: 'Pricing & Monetization Matrix',
+          subtitle: 'Base match unlocks, subscription tiers, GST rates, and dynamic prime-time surge',
+        };
+      case 'ads':
+        return {
+          title: 'Ads & Brand Sponsorships',
+          subtitle: 'In-app hero banners, 15s pre-roll video commercials, and CTR performance',
+        };
+      case 'reports':
+        return {
+          title: 'Reports Center & BI Exports',
+          subtitle: 'One-click CSV exports for revenue reconciliation, cohort retention, and NVR SLA',
+        };
+      case 'cms':
+        return {
+          title: 'CMS & Legal Policies',
+          subtitle: 'Live editor for Terms of Service, Privacy Policies, FAQs, and Release Notes',
+        };
+      case 'settings':
+        return {
+          title: 'Security, RBAC & Audit Trails',
+          subtitle: '8 Admin role definitions, permissions matrix, and audit trail activity logs',
         };
       default:
-        return { title: 'Admin Console' };
+        return { title: 'Enterprise Admin Console' };
     }
   };
 
@@ -119,7 +201,7 @@ export function App() {
           onToggleMobileSidebar={() => setIsMobileSidebarOpen((prev) => !prev)}
         />
 
-        <main style={{ flex: 1, backgroundColor: 'var(--bg-main)' }}>
+        <main style={{ flex: 1, backgroundColor: 'var(--bg-main)', padding: '24px 32px 48px' }}>
           {renderActiveView()}
         </main>
 

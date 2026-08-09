@@ -263,4 +263,56 @@ export const AdminApi = {
     const res = await api.get(`/admin/recordings/${id}/playback-url`);
     return extractData<any>(res);
   },
+
+  // 6. FlickShorts Moderation & Public Feed
+  async getFlickShorts(sport?: string): Promise<any[]> {
+    const res = await api.get('/flick-shorts/admin', { params: { sport } });
+    const raw = extractData<any>(res);
+    return Array.isArray(raw) ? raw : [];
+  },
+
+  async approveFlickShort(id: string, approved = true): Promise<any> {
+    const res = await api.patch(`/flick-shorts/${id}/approve`, { approved });
+    return extractData<any>(res);
+  },
+
+  async deleteFlickShort(id: string): Promise<any> {
+    const res = await api.delete(`/flick-shorts/${id}`);
+    return extractData<any>(res);
+  },
+
+  async createFlickShort(data: {
+    title: string;
+    sport: string;
+    tags?: string[];
+    videoUrl?: string;
+    thumbnailUrl?: string;
+  }): Promise<any> {
+    const res = await api.post('/flick-shorts', data);
+    return extractData<any>(res);
+  },
+
+  // 7. Points & Multi-Sport Leaderboard
+  async getLeaderboard(period = 'all', limit = 50): Promise<any[]> {
+    const res = await api.get('/points/leaderboard', { params: { period, limit } });
+    const raw = extractData<any>(res);
+    return Array.isArray(raw) ? raw : [];
+  },
+
+  async getPointConfigs(): Promise<any[]> {
+    const res = await api.get('/points/configs');
+    const raw = extractData<any>(res);
+    return Array.isArray(raw) ? raw : [];
+  },
+
+  async getPointLevels(): Promise<any[]> {
+    const res = await api.get('/points/levels');
+    const raw = extractData<any>(res);
+    return Array.isArray(raw) ? raw : [];
+  },
+
+  async updatePointConfig(eventType: string, data: { label?: string; points?: number; enabled?: boolean }): Promise<any> {
+    const res = await api.patch(`/points/configs/${eventType}`, data);
+    return extractData<any>(res);
+  },
 };

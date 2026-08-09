@@ -82,9 +82,18 @@ export const LiveStreamModal = ({
         });
 
         hls.on(Hls.Events.ERROR, (_event, data) => {
+          if (data.response?.code === 412 || (data.details && data.details.includes('manifestLoadError'))) {
+            setStreamHealth('CONNECTING');
+            setStatusMessage('Mux stream idle — awaiting live RTMP ingest feed from venue camera...');
+            setTimeout(() => {
+              hls?.loadSource(playbackUrl);
+            }, 3000);
+            return;
+          }
+
           if (data.fatal) {
             setStreamHealth('BUFFERING');
-            setStatusMessage('Waiting for camera video keyframes from Edge bridge...');
+            setStatusMessage('Syncing live frames with low-latency CDN...');
             if (data.type === Hls.ErrorTypes.NETWORK_ERROR) {
               hls?.startLoad();
             } else if (data.type === Hls.ErrorTypes.MEDIA_ERROR) {
@@ -96,7 +105,15 @@ export const LiveStreamModal = ({
         video.src = playbackUrl;
         video.addEventListener('loadedmetadata', () => {
           setStreamHealth('LIVE');
+          setStatusMessage('Live Broadcast Active');
           video.play().catch(() => setIsPlaying(false));
+        });
+        video.addEventListener('error', () => {
+          setStreamHealth('CONNECTING');
+          setStatusMessage('Awaiting live feed from venue camera...');
+          setTimeout(() => {
+            if (video) video.src = playbackUrl;
+          }, 3000);
         });
       }
     };
@@ -105,9 +122,12 @@ export const LiveStreamModal = ({
 
     pollInterval = setInterval(() => {
       if (streamHealth === 'CONNECTING' || streamHealth === 'BUFFERING') {
-        if (hls) hls.startLoad();
+        if (hls) {
+          hls.loadSource(playbackUrl);
+          hls.startLoad();
+        }
       }
-    }, 2500);
+    }, 4000);
 
     return () => {
       if (pollInterval) clearInterval(pollInterval);

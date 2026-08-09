@@ -27,6 +27,16 @@ export default defineConfig({
         changeOrigin: true,
         secure: false,
       },
+      '/points': {
+        target: 'https://fieldfflix-backend.onrender.com',
+        changeOrigin: true,
+        secure: false,
+      },
+      '/flick-shorts': {
+        target: 'https://fieldfflix-backend.onrender.com',
+        changeOrigin: true,
+        secure: false,
+      },
     },
   },
 });

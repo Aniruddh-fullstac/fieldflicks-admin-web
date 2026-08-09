@@ -172,6 +172,7 @@ export interface AdminRecordingItem {
   endTime?: string;
   durationMinutes?: number;
   playableUrl?: string;
+  downloadUrl?: string;
   muxPlaybackId?: string;
   s3Path?: string;
   createdAt: string;

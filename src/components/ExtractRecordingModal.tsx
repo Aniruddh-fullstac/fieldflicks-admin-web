@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import Hls from 'hls.js';
 import {
   X,
   Play,
@@ -68,6 +69,7 @@ export const ExtractRecordingModal = ({
     recordingId: string;
     status: string;
     playableUrl?: string;
+    downloadUrl?: string;
     s3Path?: string;
     startTime: string;
     endTime: string;
@@ -307,12 +309,65 @@ export const ExtractRecordingModal = ({
     }
   };
 
+  // Attach HLS or direct MP4 to video player when result.playableUrl becomes available
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video || !result?.playableUrl) return;
+
+    const url = result.playableUrl;
+    let hls: Hls | null = null;
+
+    if (url.includes('.m3u8') && Hls.isSupported()) {
+      hls = new Hls({
+        enableWorker: true,
+        lowLatencyMode: false,
+      });
+      hls.loadSource(url);
+      hls.attachMedia(video);
+      hls.on(Hls.Events.MANIFEST_PARSED, () => {
+        setIsPlaying(true);
+        video.play().catch(() => setIsPlaying(false));
+      });
+      hls.on(Hls.Events.ERROR, (_event, data) => {
+        if (data.fatal) {
+          if (data.type === Hls.ErrorTypes.NETWORK_ERROR) {
+            hls?.startLoad();
+          } else if (data.type === Hls.ErrorTypes.MEDIA_ERROR) {
+            hls?.recoverMediaError();
+          }
+        }
+      });
+    } else {
+      video.src = url;
+      video.load();
+      video.play().catch(() => setIsPlaying(false));
+    }
+
+    return () => {
+      if (hls) hls.destroy();
+    };
+  }, [result?.playableUrl]);
+
   const handleCopyUrl = () => {
     if (result?.playableUrl) {
       navigator.clipboard.writeText(result.playableUrl);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     }
+  };
+
+  const handleDownloadVideo = () => {
+    const targetUrl = result?.downloadUrl || result?.playableUrl;
+    if (!targetUrl) return;
+
+    const a = document.createElement('a');
+    a.href = targetUrl;
+    a.download = `fieldflicks_match_${result?.recordingId || 'recording'}.mp4`;
+    a.target = '_blank';
+    a.rel = 'noreferrer';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
   };
 
   const togglePlay = () => {
@@ -1223,16 +1278,25 @@ export const ExtractRecordingModal = ({
               </div>
 
               <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                <a
-                  href={result.playableUrl}
-                  target="_blank"
-                  rel="noreferrer"
-                  download
+                <button
+                  type="button"
+                  onClick={handleDownloadVideo}
                   className="btn-secondary"
-                  style={{ padding: '7px 14px', fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: 6, textDecoration: 'none' }}
+                  style={{
+                    padding: '7px 14px',
+                    fontSize: '0.75rem',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 6,
+                    cursor: 'pointer',
+                    backgroundColor: 'rgba(0, 230, 118, 0.1)',
+                    borderColor: 'rgba(0, 230, 118, 0.3)',
+                    color: 'var(--primary-neon)',
+                    fontWeight: 600,
+                  }}
                 >
                   <Download size={13} /> Download MP4
-                </a>
+                </button>
                 <a
                   href={result.playableUrl}
                   target="_blank"
@@ -1240,7 +1304,7 @@ export const ExtractRecordingModal = ({
                   className="btn-secondary"
                   style={{ padding: '7px 14px', fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: 6, textDecoration: 'none' }}
                 >
-                  <ExternalLink size={13} /> Open Tab
+                  <ExternalLink size={13} /> Open Stream
                 </a>
                 <button onClick={onClose} className="btn-primary" style={{ padding: '7px 18px', fontSize: '0.75rem' }}>
                   Done
