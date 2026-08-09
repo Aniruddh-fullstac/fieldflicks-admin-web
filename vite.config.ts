@@ -37,6 +37,11 @@ export default defineConfig({
         changeOrigin: true,
         secure: false,
       },
+      '/auth': {
+        target: 'https://fieldfflix-backend.onrender.com',
+        changeOrigin: true,
+        secure: false,
+      },
     },
   },
 });

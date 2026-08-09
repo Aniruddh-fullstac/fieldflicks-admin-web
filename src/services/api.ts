@@ -44,6 +44,19 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
+// Handle 401 Unauthorized globally by purging token
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error.response && error.response.status === 401) {
+      localStorage.removeItem('fieldflix_admin_token');
+      // If we are not already on the login page (which would have no token anyway), reload to force the LoginView
+      window.location.reload();
+    }
+    return Promise.reject(error);
+  }
+);
+
 // Helper to extract data from NestJS GlobalResponseInterceptor { success: true, data: ... }
 function extractData<T>(response: any): T {
   if (response && response.data !== undefined) {
@@ -57,6 +70,17 @@ function extractData<T>(response: any): T {
 }
 
 export const AdminApi = {
+  // Authentication
+  async sendOtp(mobile: string): Promise<any> {
+    const res = await api.post('/auth/send-otp', { mobile });
+    return extractData<any>(res);
+  },
+
+  async verifyOtp(mobile: string, otp: string): Promise<{ token: string; isFirstTimeLogin: boolean }> {
+    const res = await api.post('/auth/verify-otp', { mobile, otp });
+    return extractData<any>(res);
+  },
+
   // 1. Overview & Analytics: Real backend aggregate metrics & charts
   async getOverview(): Promise<OverviewData> {
     const res = await api.get('/admin/analytics/overview');

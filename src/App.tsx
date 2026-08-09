@@ -22,7 +22,13 @@ import { ReportsView } from './views/ReportsView';
 import { CmsView } from './views/CmsView';
 import { SettingsView } from './views/SettingsView';
 
+import { LoginView } from './views/LoginView';
+
 export function App() {
+  const [isAuthenticated, setIsAuthenticated] = useState(() => {
+    return !!localStorage.getItem('fieldflix_admin_token');
+  });
+  
   const [activeTab, setActiveTab] = useState('overview');
   const [searchTerm, setSearchTerm] = useState('');
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
@@ -38,6 +44,10 @@ export function App() {
       if (title) setWatchStreamTitle(title);
     }
   }, []);
+
+  if (!isAuthenticated) {
+    return <LoginView onLoginSuccess={() => setIsAuthenticated(true)} />;
+  }
 
   if (watchStreamId) {
     return (
