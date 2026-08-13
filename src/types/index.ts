@@ -103,6 +103,9 @@ export interface Tournament {
   prizePool: number;
   closingDate?: string;
   venue: string;
+  turfId?: string;
+  cameraIds?: string[];
+  liveStreams?: TournamentLiveStream[];
   city: string;
   startDate: string;
   endDate?: string;
@@ -122,6 +125,14 @@ export interface Tournament {
     runnerUp: string;
     semiFinalists: string;
   };
+}
+
+export interface TournamentLiveStream {
+  cameraId: string;
+  cameraName: string;
+  courtNumber?: number;
+  playbackUrl?: string;
+  isLive: boolean;
 }
 
 export interface CouponItem {

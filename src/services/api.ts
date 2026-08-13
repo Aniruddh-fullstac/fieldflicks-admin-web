@@ -6,6 +6,7 @@ import type {
   Tournament,
   CouponItem,
   VenueFleet,
+  TournamentLiveStream,
 } from '../types';
 
 const defaultProdUrl = 'https://fieldfflix-backend.onrender.com';
@@ -155,6 +156,19 @@ export const AdminApi = {
   async updateTournamentStatus(id: string, status: string): Promise<any> {
     const res = await api.patch(`/tournaments/${id}/status`, { status });
     return extractData<any>(res);
+  },
+
+  async updateTournament(id: string, dto: Partial<Tournament>): Promise<Tournament> {
+    const res = await api.patch(`/tournaments/${id}`, dto);
+    return extractData<Tournament>(res);
+  },
+
+  async updateTournamentLiveStreams(
+    id: string,
+    liveStreams: Tournament['liveStreams'],
+  ): Promise<Tournament> {
+    const res = await api.patch(`/tournaments/${id}/live-streams`, { liveStreams });
+    return extractData<Tournament>(res);
   },
 
   // 4. Coupons & Free Games: Real discount codes and assignments
