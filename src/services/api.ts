@@ -6,7 +6,6 @@ import type {
   Tournament,
   CouponItem,
   VenueFleet,
-  TournamentLiveStream,
 } from '../types';
 
 const defaultProdUrl = 'https://fieldfflix-backend.onrender.com';
