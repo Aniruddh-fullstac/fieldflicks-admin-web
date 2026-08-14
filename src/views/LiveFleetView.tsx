@@ -14,12 +14,16 @@ import {
   WifiOff,
   AlertCircle,
   Film,
+  Database,
+  Sparkles,
 } from 'lucide-react';
 import { AdminApi } from '../services/api';
 import { SkeletonCardList } from '../components/Skeleton';
 import { LiveStreamModal } from '../components/LiveStreamModal';
 import { ConfigureCourtModal } from '../components/ConfigureCourtModal';
 import { ExtractRecordingModal } from '../components/ExtractRecordingModal';
+import { VenueSetupWizardModal } from '../components/VenueSetupWizardModal';
+import { DatabaseSnapshotModal } from '../components/DatabaseSnapshotModal';
 import {
   DiagnosticErrorModal,
   parseDiagnosticError,
@@ -53,6 +57,10 @@ export const LiveFleetView = () => {
     venueId: string;
     venueName: string;
   } | null>(null);
+
+  const [showSetupWizard, setShowSetupWizard] = useState(false);
+  const [showDbSnapshot, setShowDbSnapshot] = useState(false);
+  const [dbHighlightTurfId, setDbHighlightTurfId] = useState<string | undefined>();
 
   // Unconfigured court warning prompt modal
   const [unconfiguredWarning, setUnconfiguredWarning] = useState<{
@@ -221,6 +229,27 @@ export const LiveFleetView = () => {
           </div>
 
           <button
+            onClick={() => {
+              setDbHighlightTurfId(undefined);
+              setShowDbSnapshot(true);
+            }}
+            className="btn-secondary"
+            style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 14px', fontSize: '0.8rem' }}
+          >
+            <Database size={14} />
+            View Database
+          </button>
+
+          <button
+            onClick={() => setShowSetupWizard(true)}
+            className="btn-primary"
+            style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 14px', fontSize: '0.8rem' }}
+          >
+            <Sparkles size={14} />
+            Venue Setup Wizard
+          </button>
+
+          <button
             onClick={fetchFleet}
             className="btn-secondary"
             style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 14px', fontSize: '0.8rem' }}
@@ -264,7 +293,27 @@ export const LiveFleetView = () => {
       ) : fleet.length === 0 ? (
         <div className="glass-card" style={{ padding: 48, textAlign: 'center', color: 'var(--text-muted)' }}>
           <p style={{ fontSize: '1rem', color: '#FFFFFF', fontWeight: 600 }}>No venues or cameras registered yet.</p>
-          <p style={{ fontSize: '0.8rem', marginTop: 4 }}>Add turfs and court cameras in the database to manage fleet live broadcasts.</p>
+          <p style={{ fontSize: '0.8rem', marginTop: 4, maxWidth: 480, margin: '4px auto 0' }}>
+            Use the setup wizard to add an arena (turf), courts (cameras), and Pi gateway URLs — then inspect the live database snapshot.
+          </p>
+          <div style={{ display: 'flex', justifyContent: 'center', gap: 12, marginTop: 20, flexWrap: 'wrap' }}>
+            <button
+              onClick={() => setShowSetupWizard(true)}
+              className="btn-primary"
+              style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '10px 18px' }}
+            >
+              <Sparkles size={16} />
+              Start Venue Setup Wizard
+            </button>
+            <button
+              onClick={() => setShowDbSnapshot(true)}
+              className="btn-secondary"
+              style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '10px 18px' }}
+            >
+              <Database size={16} />
+              View Database (empty)
+            </button>
+          </div>
         </div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
@@ -615,6 +664,8 @@ export const LiveFleetView = () => {
           onClose={() => setConfigureModal(null)}
           onSaved={() => {
             fetchFleet();
+            setDbHighlightTurfId(configureModal.venueId);
+            setShowDbSnapshot(true);
           }}
         />
       )}
@@ -748,6 +799,27 @@ export const LiveFleetView = () => {
           initialVenueName={extractModal.venueName}
           venues={fleet}
           onClose={() => setExtractModal(null)}
+        />
+      )}
+
+      {showSetupWizard && (
+        <VenueSetupWizardModal
+          onClose={() => setShowSetupWizard(false)}
+          onComplete={(turfId) => {
+            fetchFleet();
+            setDbHighlightTurfId(turfId);
+            setShowDbSnapshot(true);
+          }}
+        />
+      )}
+
+      {showDbSnapshot && (
+        <DatabaseSnapshotModal
+          highlightTurfId={dbHighlightTurfId}
+          onClose={() => {
+            setShowDbSnapshot(false);
+            setDbHighlightTurfId(undefined);
+          }}
         />
       )}
     </div>

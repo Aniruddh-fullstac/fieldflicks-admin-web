@@ -6,6 +6,8 @@ import type {
   Tournament,
   CouponItem,
   VenueFleet,
+  TurfRecord,
+  DatabaseSnapshot,
 } from '../types';
 
 const defaultProdUrl = 'https://fieldfflix-backend.onrender.com';
@@ -223,6 +225,72 @@ export const AdminApi = {
   }): Promise<any> {
     const res = await api.post('/admin/cameras', data);
     return extractData<any>(res);
+  },
+
+  async createTurf(dto: {
+    name: string;
+    closing_time: string;
+    sports_supported?: string[];
+    city?: string;
+    state?: string;
+    country?: string;
+    location?: string;
+    description?: string;
+    opening_time?: string;
+    latitude?: number;
+    longitude?: number;
+    contact_phone?: string;
+    contact_email?: string;
+  }): Promise<TurfRecord> {
+    const res = await api.post('/turfs', dto);
+    const raw = extractData<any>(res);
+    if (raw?.data?.id) return raw.data as TurfRecord;
+    if (raw?.id) return raw as TurfRecord;
+    return raw as TurfRecord;
+  },
+
+  async listTurfs(page = 1, limit = 100): Promise<{ items: TurfRecord[]; total: number }> {
+    const res = await api.get('/turfs', { params: { page, limit } });
+    const raw = extractData<any>(res);
+    if (raw?.items && Array.isArray(raw.items)) {
+      return {
+        items: raw.items,
+        total: raw.meta?.totalItems ?? raw.items.length,
+      };
+    }
+    if (Array.isArray(raw)) {
+      return { items: raw, total: raw.length };
+    }
+    return { items: [], total: 0 };
+  },
+
+  /** Aggregate fleet + overview into a human-readable DB snapshot for admin. */
+  async getDatabaseSnapshot(): Promise<DatabaseSnapshot> {
+    const [overview, fleet, turfPage] = await Promise.all([
+      this.getOverview(),
+      this.getFleet(),
+      this.listTurfs(1, 200),
+    ]);
+
+    const counts = {
+      turfs: overview.summary.totalVenues,
+      cameras: overview.summary.totalCourts,
+      users: overview.summary.totalUsers,
+      recordings: overview.summary.totalRecordings,
+    };
+
+    return {
+      generatedAt: new Date().toISOString(),
+      counts,
+      tableCounts: [
+        { table: 'turfs', count: counts.turfs, label: 'Venues / Arenas' },
+        { table: 'cameras', count: counts.cameras, label: 'Courts (cameras)' },
+        { table: 'users', count: counts.users, label: 'Users' },
+        { table: 'recordings', count: counts.recordings, label: 'Recordings' },
+      ],
+      fleet,
+      turfs: turfPage.items,
+    };
   },
 
   async testPiConnectivity(url: string): Promise<{ success: boolean; message: string; data?: any }> {

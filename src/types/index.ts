@@ -169,6 +169,82 @@ export interface VenueFleet {
   courts: CourtCamera[];
 }
 
+export const SPORTS_OPTIONS = [
+  'Football',
+  'Cricket',
+  'Hockey',
+  'Rugby',
+  'Tennis',
+  'Pickleball',
+  'Pickle',
+  'Paddle',
+] as const;
+
+export type SportOption = (typeof SPORTS_OPTIONS)[number];
+
+export interface TurfRecord {
+  id: string;
+  name: string;
+  description?: string;
+  city?: string;
+  state?: string;
+  country?: string;
+  location?: string;
+  address_line?: string;
+  sports_supported?: string[];
+  opening_time?: string;
+  closing_time?: string;
+  hourly_rate?: number;
+  is_active?: boolean;
+  contact_phone?: string;
+  contact_email?: string;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface CourtSetupDraft {
+  courtNumber: number;
+  name: string;
+  raspberryPiBaseUrl: string;
+  nvrChannels: string;
+}
+
+export interface VenueSetupDraft {
+  name: string;
+  sportsSupported: SportOption[];
+  city: string;
+  state: string;
+  country: string;
+  location: string;
+  description: string;
+  openingTime: string;
+  closingTime: string;
+  latitude: string;
+  longitude: string;
+  contactPhone: string;
+  contactEmail: string;
+  courts: CourtSetupDraft[];
+}
+
+export interface DatabaseTableCount {
+  table: string;
+  count: number;
+  label: string;
+}
+
+export interface DatabaseSnapshot {
+  generatedAt: string;
+  counts: {
+    turfs: number;
+    cameras: number;
+    users: number;
+    recordings: number;
+  };
+  tableCounts: DatabaseTableCount[];
+  fleet: VenueFleet[];
+  turfs: TurfRecord[];
+}
+
 export interface AdminRecordingItem {
   id: string;
   venueName: string;
