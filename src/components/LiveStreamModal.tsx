@@ -13,6 +13,7 @@ import {
   RefreshCw,
   Share2,
   Video,
+  Camera,
 } from "lucide-react";
 import type { CourtCamera } from "../types";
 
@@ -25,6 +26,7 @@ interface StreamPlayerProps {
   isMuted: boolean;
   onTogglePlay: () => void;
   label?: string;
+  visible: boolean;
 }
 
 const StreamPlayer = ({
@@ -33,6 +35,7 @@ const StreamPlayer = ({
   isMuted,
   onTogglePlay,
   label,
+  visible,
 }: StreamPlayerProps) => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [streamHealth, setStreamHealth] = useState<
@@ -151,9 +154,10 @@ const StreamPlayer = ({
     <div
       style={{
         position: "relative",
-        flex: 1,
+        width: "100%",
+        height: "100%",
         backgroundColor: "#000000",
-        display: "flex",
+        display: visible ? "flex" : "none",
         flexDirection: "column",
       }}
     >
@@ -268,7 +272,11 @@ export const LiveStreamModal = ({
   const [isMuted, setIsMuted] = useState(true);
   const [copiedWatchLink, setCopiedWatchLink] = useState(false);
   const [copiedHlsLink, setCopiedHlsLink] = useState(false);
+  const [activeChannel, setActiveChannel] = useState<"primary" | "secondary">(
+    "primary",
+  );
 
+  // We only generate a watch link for the primary channel for now.
   const playbackId = playbackUrl.split("/").pop()?.replace(".m3u8", "") || "";
   const watchWebUrl = `${window.location.origin}/?stream=${playbackId}&title=${encodeURIComponent(
     `${venueName} — ${court.name}`,
@@ -321,7 +329,7 @@ export const LiveStreamModal = ({
         className="glass-card"
         style={{
           width: "100%",
-          maxWidth: secondaryPlaybackUrl ? 1200 : 960,
+          maxWidth: 960,
           backgroundColor: "rgba(10, 15, 24, 0.95)",
           overflow: "hidden",
           display: "flex",
@@ -378,6 +386,60 @@ export const LiveStreamModal = ({
             </div>
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            {secondaryPlaybackUrl && (
+              <div
+                style={{
+                  display: "flex",
+                  backgroundColor: "rgba(255,255,255,0.05)",
+                  borderRadius: 8,
+                  padding: 4,
+                }}
+              >
+                <button
+                  onClick={() => setActiveChannel("primary")}
+                  style={{
+                    border: "none",
+                    background:
+                      activeChannel === "primary"
+                        ? "rgba(255,255,255,0.1)"
+                        : "transparent",
+                    color: activeChannel === "primary" ? "#fff" : "#94A3B8",
+                    padding: "6px 12px",
+                    borderRadius: 6,
+                    fontSize: "0.8rem",
+                    fontWeight: 600,
+                    cursor: "pointer",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 6,
+                  }}
+                >
+                  <Camera size={14} /> Ch 1
+                </button>
+                <button
+                  onClick={() => setActiveChannel("secondary")}
+                  style={{
+                    border: "none",
+                    background:
+                      activeChannel === "secondary"
+                        ? "rgba(255,255,255,0.1)"
+                        : "transparent",
+                    color: activeChannel === "secondary" ? "#fff" : "#94A3B8",
+                    padding: "6px 12px",
+                    borderRadius: 6,
+                    fontSize: "0.8rem",
+                    fontWeight: 600,
+                    cursor: "pointer",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 6,
+                  }}
+                >
+                  <Camera size={14} /> Ch 2
+                </button>
+              </div>
+            )}
+
             {onStopStream && (
               <button
                 onClick={onStopStream}
@@ -419,8 +481,7 @@ export const LiveStreamModal = ({
           style={{
             position: "relative",
             width: "100%",
-            aspectRatio: secondaryPlaybackUrl ? "auto" : "16/9",
-            height: secondaryPlaybackUrl ? "60vh" : "auto",
+            aspectRatio: "16/9",
             backgroundColor: "#000000",
             display: "flex",
             alignItems: "stretch",
@@ -428,29 +489,26 @@ export const LiveStreamModal = ({
             overflow: "hidden",
           }}
         >
-          {/* Left / Primary Stream */}
+          {/* Primary Stream */}
           <StreamPlayer
             playbackUrl={playbackUrl}
             isPlaying={isPlaying}
             isMuted={isMuted}
             onTogglePlay={togglePlay}
             label={secondaryPlaybackUrl ? "Channel 1" : undefined}
+            visible={activeChannel === "primary"}
           />
 
-          {/* Right / Secondary Stream */}
+          {/* Secondary Stream */}
           {secondaryPlaybackUrl && (
-            <>
-              <div
-                style={{ width: 2, backgroundColor: "#1E293B", zIndex: 20 }}
-              />
-              <StreamPlayer
-                playbackUrl={secondaryPlaybackUrl}
-                isPlaying={isPlaying}
-                isMuted={isMuted}
-                onTogglePlay={togglePlay}
-                label="Channel 2"
-              />
-            </>
+            <StreamPlayer
+              playbackUrl={secondaryPlaybackUrl}
+              isPlaying={isPlaying}
+              isMuted={isMuted}
+              onTogglePlay={togglePlay}
+              label="Channel 2"
+              visible={activeChannel === "secondary"}
+            />
           )}
 
           {/* Bottom Floating Controls Overlay */}
