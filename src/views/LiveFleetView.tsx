@@ -43,6 +43,7 @@ export const LiveFleetView = () => {
     court: CourtCamera;
     venueName: string;
     playbackUrl: string;
+    dualChannelNote?: string;
   } | null>(null);
 
   // Extract Recording Modal state
@@ -88,6 +89,85 @@ export const LiveFleetView = () => {
   useEffect(() => {
     fetchFleet();
   }, []);
+
+  const handleStartDualStream = async (court: CourtCamera, venue: VenueFleet) => {
+    const isConfigured = !!(court.raspberryPiBaseUrl && court.raspberryPiBaseUrl.trim().length > 0);
+    if (!isConfigured) {
+      setUnconfiguredWarning({ court, venueId: venue.turfId, venueName: venue.turfName });
+      return;
+    }
+
+    setActionLoadingId(`${court.cameraId}-dual`);
+    try {
+      const dual = await AdminApi.startDualLiveStream(
+        court.cameraId,
+        `${venue.turfName} ${court.name}`,
+        [1, 2],
+      );
+      const primary = dual.channels[0]?.result;
+      const playbackUrl =
+        primary?.playbackUrl || `https://stream.mux.com/live-${court.cameraId}.m3u8`;
+
+      setFleet((prev) =>
+        prev.map((v) => ({
+          ...v,
+          courts: v.courts.map((c) =>
+            c.cameraId === court.cameraId
+              ? { ...c, isLiveStreaming: true, status: 'STREAMING', livePlaybackUrl: playbackUrl }
+              : c
+          ),
+        }))
+      );
+
+      setActiveModal({
+        court: { ...court, isLiveStreaming: true, livePlaybackUrl: playbackUrl },
+        venueName: venue.turfName,
+        playbackUrl,
+        dualChannelNote:
+          dual.channels.length > 1
+            ? `NVR channels 1 & 2 started. Primary preview: channel 1.`
+            : undefined,
+      });
+      setActionLoadingId(null);
+    } catch (err: any) {
+      setActionLoadingId(null);
+      const diag = parseDiagnosticError(err, {
+        courtName: `${venue.turfName} — ${court.name} (dual ch 1+2)`,
+        courtNumber: court.courtNumber,
+        deviceUrl: court.raspberryPiBaseUrl,
+      });
+      setDiagnosticError(diag);
+    }
+  };
+
+  const handleStopDualStream = async (court: CourtCamera, venueName: string) => {
+    setActionLoadingId(`${court.cameraId}-dual-stop`);
+    try {
+      await AdminApi.stopDualLiveStream(court.cameraId, [1, 2]);
+      setFleet((prev) =>
+        prev.map((v) => ({
+          ...v,
+          courts: v.courts.map((c) =>
+            c.cameraId === court.cameraId
+              ? { ...c, isLiveStreaming: false, status: 'ONLINE', livePlaybackUrl: undefined }
+              : c
+          ),
+        }))
+      );
+      if (activeModal?.court.cameraId === court.cameraId) {
+        setActiveModal(null);
+      }
+      setActionLoadingId(null);
+    } catch (err: any) {
+      setActionLoadingId(null);
+      const diag = parseDiagnosticError(err, {
+        courtName: `${venueName} — ${court.name} (dual stop)`,
+        courtNumber: court.courtNumber,
+        deviceUrl: court.raspberryPiBaseUrl,
+      });
+      setDiagnosticError(diag);
+    }
+  };
 
   const handleStartStream = async (court: CourtCamera, venue: VenueFleet) => {
     // STREAMING GUARD: Immediately notify if court isn't configured
@@ -384,7 +464,10 @@ export const LiveFleetView = () => {
                   const isConfigured = !!(
                     court.raspberryPiBaseUrl && court.raspberryPiBaseUrl.trim().length > 0
                   );
-                  const isActionLoading = actionLoadingId === court.cameraId;
+                  const isActionLoading =
+                    actionLoadingId === court.cameraId ||
+                    actionLoadingId === `${court.cameraId}-dual` ||
+                    actionLoadingId === `${court.cameraId}-dual-stop`;
 
                   return (
                     <div
@@ -513,6 +596,7 @@ export const LiveFleetView = () => {
                           </div>
                         ) : isConfigured ? (
                           /* CONFIGURED COURT: Start Stream, Fetch Video & Settings buttons */
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                           <div style={{ display: 'flex', gap: 6 }}>
                             <button
                               onClick={() => handleStartStream(court, venue)}
@@ -602,6 +686,36 @@ export const LiveFleetView = () => {
                               <Settings size={13} />
                             </button>
                           </div>
+                          <button
+                            onClick={() => handleStartDualStream(court, venue)}
+                            disabled={isActionLoading}
+                            className="btn-secondary"
+                            title="Start NVR channels 1 & 2 on the same Pi (dual-camera court)"
+                            style={{
+                              width: '100%',
+                              padding: '8px 10px',
+                              fontSize: '0.72rem',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              gap: 6,
+                              color: 'var(--accent-cyan)',
+                              borderColor: 'rgba(0, 229, 255, 0.35)',
+                              opacity: isActionLoading ? 0.7 : 1,
+                            }}
+                          >
+                            {actionLoadingId === `${court.cameraId}-dual` ? (
+                              <>
+                                <RefreshCw size={12} className="spin" />
+                                Starting dual stream...
+                              </>
+                            ) : (
+                              <>
+                                <RadioTower size={12} /> Dual Stream (NVR Ch 1 + 2)
+                              </>
+                            )}
+                          </button>
+                          </div>
                         ) : (
                           /* UNCONFIGURED COURT: Setup Pi button */
                           <div style={{ display: 'flex', gap: 8 }}>
@@ -650,8 +764,13 @@ export const LiveFleetView = () => {
           court={activeModal.court}
           venueName={activeModal.venueName}
           playbackUrl={activeModal.playbackUrl}
+          dualChannelNote={activeModal.dualChannelNote}
           onClose={() => setActiveModal(null)}
-          onStopStream={() => handleStopStream(activeModal.court, activeModal.venueName)}
+          onStopStream={() =>
+            activeModal.dualChannelNote
+              ? handleStopDualStream(activeModal.court, activeModal.venueName)
+              : handleStopStream(activeModal.court, activeModal.venueName)
+          }
         />
       )}
 

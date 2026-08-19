@@ -319,17 +319,46 @@ export const AdminApi = {
     }
   },
 
-  async startLiveStream(cameraId: string, courtName: string): Promise<any> {
+  async startLiveStream(
+    cameraId: string,
+    courtName: string,
+    channel?: number,
+  ): Promise<any> {
     const res = await api.post('/recording/start-live-stream', {
       cameraId,
       streamTitle: `Live Stream: ${courtName}`,
+      ...(channel != null ? { channel } : {}),
     });
     return extractData<any>(res);
   },
 
-  async stopLiveStream(cameraId: string): Promise<any> {
-    const res = await api.post('/recording/stop-live-stream', { cameraId });
+  async startDualLiveStream(
+    cameraId: string,
+    courtName: string,
+    channels: number[] = [1, 2],
+  ): Promise<{ channels: Array<{ channel: number; result: any }> }> {
+    const results = await Promise.all(
+      channels.map(async (channel) => ({
+        channel,
+        result: await this.startLiveStream(cameraId, `${courtName} (NVR ch ${channel})`, channel),
+      })),
+    );
+    return { channels: results };
+  },
+
+  async stopLiveStream(cameraId: string, channel?: number): Promise<any> {
+    const res = await api.post('/recording/stop-live-stream', {
+      cameraId,
+      ...(channel != null ? { channel } : {}),
+    });
     return extractData<any>(res);
+  },
+
+  async stopDualLiveStream(
+    cameraId: string,
+    channels: number[] = [1, 2],
+  ): Promise<void> {
+    await Promise.all(channels.map((channel) => this.stopLiveStream(cameraId, channel)));
   },
 
   async getRecordings(params?: { page?: number; limit?: number; status?: string }): Promise<{

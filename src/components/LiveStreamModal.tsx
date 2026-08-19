@@ -20,6 +20,7 @@ interface LiveStreamModalProps {
   court: CourtCamera;
   venueName: string;
   playbackUrl: string;
+  dualChannelNote?: string;
   onClose: () => void;
   onStopStream?: () => void;
 }
@@ -28,6 +29,7 @@ export const LiveStreamModal = ({
   court,
   venueName,
   playbackUrl,
+  dualChannelNote,
   onClose,
   onStopStream,
 }: LiveStreamModalProps) => {
@@ -262,6 +264,7 @@ export const LiveStreamModal = ({
               </h3>
               <p style={{ fontSize: '0.75rem', color: 'var(--text-dim)', margin: '2px 0 0 0' }}>
                 Low-Latency Live Relay via Raspberry Pi Edge Bridge
+                {dualChannelNote ? ` · ${dualChannelNote}` : ''}
               </p>
             </div>
           </div>
