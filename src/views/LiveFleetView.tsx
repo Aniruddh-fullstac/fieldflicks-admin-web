@@ -43,6 +43,7 @@ export const LiveFleetView = () => {
     court: CourtCamera;
     venueName: string;
     playbackUrl: string;
+    secondaryPlaybackUrl?: string;
     dualChannelNote?: string;
   } | null>(null);
 
@@ -105,6 +106,7 @@ export const LiveFleetView = () => {
         [1, 2],
       );
       const primary = dual.channels[0]?.result;
+      const secondary = dual.channels[1]?.result;
       const playbackUrl =
         primary?.playbackUrl || `https://stream.mux.com/live-${court.cameraId}.m3u8`;
 
@@ -119,13 +121,16 @@ export const LiveFleetView = () => {
         }))
       );
 
+      const secondaryPlaybackUrl = secondary?.playbackId ? `https://stream.mux.com/${secondary.playbackId}.m3u8` : undefined;
+
       setActiveModal({
         court: { ...court, isLiveStreaming: true, livePlaybackUrl: playbackUrl },
         venueName: venue.turfName,
         playbackUrl,
+        secondaryPlaybackUrl,
         dualChannelNote:
           dual.channels.length > 1
-            ? `NVR channels 1 & 2 started. Primary preview: channel 1.`
+            ? `NVR channels 1 & 2 active.`
             : undefined,
       });
       setActionLoadingId(null);
@@ -764,6 +769,7 @@ export const LiveFleetView = () => {
           court={activeModal.court}
           venueName={activeModal.venueName}
           playbackUrl={activeModal.playbackUrl}
+          secondaryPlaybackUrl={activeModal.secondaryPlaybackUrl}
           dualChannelNote={activeModal.dualChannelNote}
           onClose={() => setActiveModal(null)}
           onStopStream={() =>
