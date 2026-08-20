@@ -12,6 +12,8 @@ import {
   Play,
   Square,
   Video,
+  Image as ImageIcon,
+  Loader2,
 } from 'lucide-react';
 import { AdminApi } from '../services/api';
 import { SkeletonCardList } from '../components/Skeleton';
@@ -28,6 +30,7 @@ export const TournamentsView = () => {
   const [filterStatus, setFilterStatus] = useState<string>('All');
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [streamLoadingId, setStreamLoadingId] = useState<string | null>(null);
+  const [uploadingImage, setUploadingImage] = useState(false);
   const [activeStreamModal, setActiveStreamModal] = useState<{
     court: CourtCamera;
     venueName: string;
@@ -48,6 +51,7 @@ export const TournamentsView = () => {
     skillLevel: 'Intermediate / Open',
     championPrize: '₹ 25,000 + Trophy',
     runnerUpPrize: '₹ 15,000',
+    bannerImage: '',
   });
 
   const selectedVenue = useMemo(
@@ -170,6 +174,33 @@ export const TournamentsView = () => {
     });
   };
 
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    
+    setUploadingImage(true);
+    try {
+      const key = `tournaments/banners/${Date.now()}_${file.name.replace(/[^a-zA-Z0-9.]/g, '_')}`;
+      const presignedUrl = await AdminApi.getPresignedUrl(key, 'fieldflix-dev-media');
+      
+      await fetch(presignedUrl, {
+        method: 'PUT',
+        body: file,
+        headers: {
+          'Content-Type': file.type
+        }
+      });
+      
+      const finalUrl = presignedUrl.split('?')[0];
+      setFormData(prev => ({ ...prev, bannerImage: finalUrl }));
+      
+    } catch (err: any) {
+      alert('Failed to upload image: ' + (err.message || 'Unknown error'));
+    } finally {
+      setUploadingImage(false);
+    }
+  };
+
   const fetchTournaments = () => {
     setLoading(true);
     setError(null);
@@ -244,6 +275,7 @@ export const TournamentsView = () => {
       maxParticipants: Number(formData.maxParticipants),
       skillLevel: formData.skillLevel,
       status: 'Upcoming',
+      bannerImage: formData.bannerImage,
       prizes: {
         champion: formData.championPrize,
         runnerUp: formData.runnerUpPrize,
@@ -269,6 +301,7 @@ export const TournamentsView = () => {
         skillLevel: 'Intermediate / Open',
         championPrize: '₹ 25,000 + Trophy',
         runnerUpPrize: '₹ 15,000',
+        bannerImage: '',
       });
     } catch (err: any) {
       alert(err.response?.data?.message || 'Failed to publish tournament');
@@ -702,6 +735,43 @@ export const TournamentsView = () => {
                     ))}
                   </select>
                 </div>
+              </div>
+
+              {/* Banner Image Upload */}
+              <div>
+                <label style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 600 }}>Tournament Banner Image (Optional)</label>
+                <div style={{
+                  marginTop: 6,
+                  padding: 12,
+                  border: '1px dashed var(--border-subtle)',
+                  borderRadius: 'var(--radius-sm)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 12,
+                  backgroundColor: 'rgba(255, 255, 255, 0.02)'
+                }}>
+                  {formData.bannerImage ? (
+                    <div style={{ position: 'relative', width: '100px', height: '60px', borderRadius: 4, overflow: 'hidden' }}>
+                      <img src={formData.bannerImage} alt="Banner Preview" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                      <button type="button" onClick={() => setFormData({ ...formData, bannerImage: '' })} style={{ position: 'absolute', top: 2, right: 2, background: 'rgba(0,0,0,0.6)', border: 'none', color: '#fff', borderRadius: '50%', padding: 4, cursor: 'pointer' }}>
+                        <X size={10} />
+                      </button>
+                    </div>
+                  ) : (
+                    <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 10 }}>
+                      {uploadingImage ? <Loader2 size={18} className="spin" color="var(--primary-neon)" /> : <ImageIcon size={18} color="var(--text-muted)" />}
+                      <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>{uploadingImage ? 'Uploading...' : 'No image uploaded'}</span>
+                    </div>
+                  )}
+                  
+                  <div>
+                    <input type="file" id="banner-upload" accept="image/*" onChange={handleImageUpload} style={{ display: 'none' }} disabled={uploadingImage} />
+                    <label htmlFor="banner-upload" className="btn-secondary" style={{ padding: '6px 12px', fontSize: '0.75rem', cursor: uploadingImage ? 'not-allowed' : 'pointer', display: 'inline-block', margin: 0 }}>
+                      Choose Image
+                    </label>
+                  </div>
+                </div>
+                <p style={{ fontSize: '0.7rem', color: 'var(--text-dim)', marginTop: 4 }}>This image will appear on the front of the tournament card in the mobile app.</p>
               </div>
 
               {formData.turfId && (

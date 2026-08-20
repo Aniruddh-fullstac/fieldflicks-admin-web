@@ -483,13 +483,5 @@ export const AdminApi = {
     const res = await api.put('/admin/pricing/config', data);
     return extractData<any>(res);
   },
-
-  async getPresignedUrl(key: string, bucketName?: string): Promise<string> {
-    const res = await api.get('/file-service/presigned-url', {
-      params: { key, bucketName }
-    });
-    // @ts-ignore
-    return res?.data?.presignedUrl || extractData<any>(res)?.presignedUrl || '';
-  },
 };
 

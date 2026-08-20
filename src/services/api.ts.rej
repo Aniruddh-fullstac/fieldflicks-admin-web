@@ -1,0 +1,15 @@
+@@ -282,6 +282,14 @@
+       throw err;
+     }
+   },
++
++  async getPresignedUrl(key: string, bucketName?: string): Promise<string> {
++    const res = await api.get('/file-service/presigned-url', {
++      params: { key, bucketName }
++    });
++    const raw = extractData<{ presignedUrl: string }>(res);
++    return raw.presignedUrl;
++  }
+ };
+ 
+ // ... (Any other code if necessary)
