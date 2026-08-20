@@ -78,7 +78,11 @@ export const TournamentsView = () => {
   };
 
   const handleStartStream = async (tournament: Tournament, cameraId: string) => {
-    const match = findCourtInFleet(cameraId);
+    const isCh2 = cameraId.endsWith('_ch2');
+    const baseCameraId = cameraId.replace('_ch1', '').replace('_ch2', '');
+    const channel = isCh2 ? 2 : 1;
+    
+    const match = findCourtInFleet(baseCameraId);
     if (!match) {
       alert('Camera not found in fleet. Refresh and try again.');
       return;
@@ -91,14 +95,14 @@ export const TournamentsView = () => {
 
     setStreamLoadingId(cameraId);
     try {
-      const res = await AdminApi.startLiveStream(cameraId, `${venue.turfName} ${court.name}`);
-      const playbackUrl = res.playbackUrl || `https://stream.mux.com/live-${cameraId}.m3u8`;
+      const res = await AdminApi.startLiveStream(baseCameraId, `${venue.turfName} ${court.name}`, channel);
+      const playbackUrl = res.playbackUrl || `https://stream.mux.com/live-${baseCameraId}.m3u8`;
       const existing = tournament.liveStreams ?? [];
       const nextStreams: TournamentLiveStream[] = [
         ...existing.filter((s) => s.cameraId !== cameraId),
         {
           cameraId,
-          cameraName: court.name,
+          cameraName: court.name + (isCh2 ? ' (Ch 2)' : ' (Ch 1)'),
           courtNumber: court.courtNumber,
           playbackUrl,
           isLive: true,
@@ -106,7 +110,7 @@ export const TournamentsView = () => {
       ];
       await persistLiveStreams(tournament, nextStreams);
       setActiveStreamModal({
-        court: { ...court, isLiveStreaming: true, livePlaybackUrl: playbackUrl },
+        court: { ...court, isLiveStreaming: !isCh2, isLiveStreamingCh2: isCh2, livePlaybackUrl: playbackUrl },
         venueName: venue.turfName,
         playbackUrl,
       });
@@ -118,14 +122,18 @@ export const TournamentsView = () => {
   };
 
   const handleStopStream = async (tournament: Tournament, cameraId: string) => {
+    const isCh2 = cameraId.endsWith('_ch2');
+    const baseCameraId = cameraId.replace('_ch1', '').replace('_ch2', '');
+    const channel = isCh2 ? 2 : 1;
+
     setStreamLoadingId(cameraId);
     try {
-      await AdminApi.stopLiveStream(cameraId);
+      await AdminApi.stopLiveStream(baseCameraId, channel);
       const nextStreams = (tournament.liveStreams ?? []).map((s) =>
         s.cameraId === cameraId ? { ...s, isLive: false, playbackUrl: undefined } : s,
       );
       await persistLiveStreams(tournament, nextStreams);
-      if (activeStreamModal?.court.cameraId === cameraId) {
+      if (activeStreamModal?.court.cameraId === baseCameraId) {
         setActiveStreamModal(null);
       }
     } catch (err: any) {
@@ -136,7 +144,8 @@ export const TournamentsView = () => {
   };
 
   const handleWatchStream = (tournament: Tournament, cameraId: string) => {
-    const match = findCourtInFleet(cameraId);
+    const baseCameraId = cameraId.replace('_ch1', '').replace('_ch2', '');
+    const match = findCourtInFleet(baseCameraId);
     const stream = tournament.liveStreams?.find((s) => s.cameraId === cameraId);
     if (!match || !stream?.playbackUrl) {
       alert('No active playback URL for this camera.');
@@ -718,29 +727,52 @@ export const TournamentsView = () => {
                       </span>
                     ) : (
                       venueCourts.map((court) => (
-                        <label
-                          key={court.cameraId}
-                          style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: 10,
-                            fontSize: '0.85rem',
-                            color: '#FFF',
-                            cursor: 'pointer',
-                          }}
-                        >
-                          <input
-                            type="checkbox"
-                            checked={formData.cameraIds.includes(court.cameraId)}
-                            onChange={() => toggleCameraSelection(court.cameraId)}
-                          />
-                          <span>
-                            {court.name} (Court {court.courtNumber})
-                            {!court.raspberryPiBaseUrl?.trim() && (
-                              <span style={{ color: 'var(--accent-crimson)', marginLeft: 6 }}>— not configured</span>
-                            )}
-                          </span>
-                        </label>
+                        <React.Fragment key={court.cameraId}>
+                          <label
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: 10,
+                              fontSize: '0.85rem',
+                              color: '#FFF',
+                              cursor: 'pointer',
+                            }}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={formData.cameraIds.includes(`${court.cameraId}_ch1`)}
+                              onChange={() => toggleCameraSelection(`${court.cameraId}_ch1`)}
+                            />
+                            <span>
+                              {court.name} (Ch 1) (Court {court.courtNumber})
+                              {!court.raspberryPiBaseUrl?.trim() && (
+                                <span style={{ color: 'var(--accent-crimson)', marginLeft: 6 }}>— not configured</span>
+                              )}
+                            </span>
+                          </label>
+                          <label
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: 10,
+                              fontSize: '0.85rem',
+                              color: '#FFF',
+                              cursor: 'pointer',
+                            }}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={formData.cameraIds.includes(`${court.cameraId}_ch2`)}
+                              onChange={() => toggleCameraSelection(`${court.cameraId}_ch2`)}
+                            />
+                            <span>
+                              {court.name} (Ch 2) (Court {court.courtNumber})
+                              {!court.raspberryPiBaseUrl?.trim() && (
+                                <span style={{ color: 'var(--accent-crimson)', marginLeft: 6 }}>— not configured</span>
+                              )}
+                            </span>
+                          </label>
+                        </React.Fragment>
                       ))
                     )}
                   </div>
