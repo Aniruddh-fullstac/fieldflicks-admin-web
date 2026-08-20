@@ -1,143 +1,64 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   Tag,
-  CheckCircle2,
   DollarSign,
-  Layers,
   Percent,
   Sparkles,
   Save,
-  Zap,
 } from 'lucide-react';
-
-interface ContentPriceRule {
-  id: string;
-  name: string;
-  category: 'MATCH_UNLOCK' | 'HIGHLIGHTS' | 'STREAMING' | 'REEL';
-  basePriceInr: number;
-  promoPriceInr?: number;
-  description: string;
-  isLive: boolean;
-}
-
-interface SubscriptionTier {
-  id: string;
-  title: string;
-  billingCycle: 'MONTHLY' | 'QUARTERLY' | 'ANNUAL';
-  priceInr: number;
-  includedMatches: number;
-  aiHighlightsPerMonth: number;
-  is4kExportEnabled: boolean;
-  priorityQueue: boolean;
-  activeSubscribersCount: number;
-}
+import { AdminApi } from '../services/api';
 
 export const PricingView = () => {
-  const [contentPrices, setContentPrices] = useState<ContentPriceRule[]>([
-    {
-      id: 'cp-1',
-      name: 'Full 60-Min Match Footage Unlock',
-      category: 'MATCH_UNLOCK',
-      basePriceInr: 299,
-      promoPriceInr: 249,
-      description: 'Raw high-definition NVR footage download with permanent cloud access',
-      isLive: true,
-    },
-    {
-      id: 'cp-2',
-      name: 'AI Highlight Reel (Top 10 Moments)',
-      category: 'HIGHLIGHTS',
-      basePriceInr: 149,
-      promoPriceInr: 99,
-      description: 'Automated goal, smash, and skill detection with music & telemetry overlay',
-      isLive: true,
-    },
-    {
-      id: 'cp-3',
-      name: 'Single Clip Custom Manual Trim',
-      category: 'REEL',
-      basePriceInr: 49,
-      description: 'Up to 60-second custom trimmed video clip from match timeline',
-      isLive: true,
-    },
-    {
-      id: 'cp-4',
-      name: 'Live Tournament Match Stream Pass',
-      category: 'STREAMING',
-      basePriceInr: 99,
-      description: 'Spectator live viewing pass with low-latency chat and multi-angle camera view',
-      isLive: true,
-    },
-  ]);
+  const [pricingConfig, setPricingConfig] = useState({
+    cricket_hourly_rate: 240,
+    pickleball_hourly_rate: 1000,
+    padel_hourly_rate: 1500,
+    default_hourly_rate: 500,
+    highlight_base_price: 149,
+    shorts_base_price: 49,
+    gst_rate: 0.18,
+  });
 
-  const [subscriptions] = useState<SubscriptionTier[]>([
-    {
-      id: 'sub-1',
-      title: 'Pro Athlete Monthly Pass',
-      billingCycle: 'MONTHLY',
-      priceInr: 999,
-      includedMatches: 8,
-      aiHighlightsPerMonth: 15,
-      is4kExportEnabled: true,
-      priorityQueue: true,
-      activeSubscribersCount: 242,
-    },
-    {
-      id: 'sub-2',
-      title: 'Tournament League Quarterly',
-      billingCycle: 'QUARTERLY',
-      priceInr: 2499,
-      includedMatches: 25,
-      aiHighlightsPerMonth: 50,
-      is4kExportEnabled: true,
-      priorityQueue: true,
-      activeSubscribersCount: 88,
-    },
-    {
-      id: 'sub-3',
-      title: 'Club Academy Annual VIP',
-      billingCycle: 'ANNUAL',
-      priceInr: 7999,
-      includedMatches: 120,
-      aiHighlightsPerMonth: 200,
-      is4kExportEnabled: true,
-      priorityQueue: true,
-      activeSubscribersCount: 34,
-    },
-  ]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [toastMsg, setToastMsg] = useState<string | null>(null);
 
-  // Tax & Fee Controls
-  const [gstRate, setGstRate] = useState<number>(18);
+  useEffect(() => {
+    AdminApi.getPricingConfig()
+      .then((data) => {
+        if (data && data.data) {
+          setPricingConfig(data.data);
+        }
+      })
+      .catch(console.error)
+      .finally(() => setIsLoading(false));
+  }, []);
+
   const [gatewayConvenienceFee, setGatewayConvenienceFee] = useState<number>(2);
   const [platformFeeInr, setPlatformFeeInr] = useState<number>(10);
-  const [weekendSurgeActive, setWeekendSurgeActive] = useState<boolean>(true);
-  const [weekendSurgePercent, setWeekendSurgePercent] = useState<number>(15);
-  const [toastMsg, setToastMsg] = useState<string | null>(null);
 
   const showToast = (msg: string) => {
     setToastMsg(msg);
     setTimeout(() => setToastMsg(null), 3500);
   };
 
-  const handleUpdatePrice = (id: string, newPrice: number) => {
-    setContentPrices((prev) =>
-      prev.map((cp) => (cp.id === id ? { ...cp, basePriceInr: newPrice } : cp))
-    );
+  const handleUpdatePrice = (key: keyof typeof pricingConfig, value: number) => {
+    setPricingConfig((prev) => ({ ...prev, [key]: value }));
   };
 
-  const handleToggleRule = (id: string) => {
-    setContentPrices((prev) =>
-      prev.map((cp) => (cp.id === id ? { ...cp, isLive: !cp.isLive } : cp))
-    );
+  const handleSaveAll = async () => {
+    try {
+      await AdminApi.updatePricingConfig(pricingConfig);
+      showToast('✨ Pricing configuration saved successfully and synced to app!');
+    } catch (err) {
+      console.error(err);
+      showToast('❌ Failed to save pricing config');
+    }
   };
 
-  const handleSaveAll = () => {
-    showToast('✨ Pricing matrix, subscription tiers, and tax rules saved and published to mobile app!');
-  };
+  if (isLoading) return <div style={{ color: '#fff' }}>Loading pricing config...</div>;
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 24, animation: 'fadeIn 0.3s ease' }}>
-      {/* Toast Banner */}
       {toastMsg && (
         <div
           style={{
@@ -163,15 +84,14 @@ export const PricingView = () => {
         </div>
       )}
 
-      {/* Header */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 16 }}>
         <div>
           <h2 style={{ fontSize: '1.5rem', fontWeight: 800, color: '#FFFFFF', display: 'flex', alignItems: 'center', gap: 10 }}>
             <Tag size={26} color="var(--primary-neon)" />
-            Pricing, Packages & Monetization Matrix
+            Pricing & Monetization Configuration
           </h2>
           <p style={{ color: 'var(--text-muted)', fontSize: '0.875rem', marginTop: 4 }}>
-            Configure base content prices, athlete subscription memberships, taxes, and dynamic surge rules
+            Configure sport-wise hourly rates, highlights, and tax rules from the backend database.
           </p>
         </div>
 
@@ -189,27 +109,33 @@ export const PricingView = () => {
           }}
         >
           <Save size={18} />
-          Publish Price Changes
+          Save Changes
         </button>
       </div>
 
-      {/* Section 1: Base Content Pricing Matrix */}
       <div className="glass-card" style={{ padding: 24, display: 'flex', flexDirection: 'column', gap: 16 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div>
             <h3 style={{ fontSize: '1.15rem', fontWeight: 700, color: '#FFFFFF', display: 'flex', alignItems: 'center', gap: 8 }}>
               <DollarSign size={20} color="var(--primary-neon)" />
-              Pay-Per-Match & Highlight Pricing
+              Pay-Per-Match & Content Pricing
             </h3>
             <p style={{ color: 'var(--text-muted)', fontSize: '0.8rem', marginTop: 2 }}>
-              Standard retail pricing charged to non-subscribed athletes upon video unlock
+              Dynamic sport-based hourly rates and media add-on base prices
             </p>
           </div>
-          <span className="badge-neon green">Active In App Store</span>
+          <span className="badge-neon green">Active In App</span>
         </div>
 
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 16 }}>
-          {contentPrices.map((cp) => (
+          {[
+            { id: 'cricket_hourly_rate', name: 'Cricket Match (Hourly)', desc: 'Base recording price per hour for Cricket' },
+            { id: 'pickleball_hourly_rate', name: 'Pickleball Match (Hourly)', desc: 'Base recording price per hour for Pickleball' },
+            { id: 'padel_hourly_rate', name: 'Padel Match (Hourly)', desc: 'Base recording price per hour for Padel' },
+            { id: 'default_hourly_rate', name: 'Default Match (Hourly)', desc: 'Base recording price per hour for unconfigured sports' },
+            { id: 'highlight_base_price', name: 'AI Highlight Reel', desc: 'Flat fee to unlock the AI Highlight Reel' },
+            { id: 'shorts_base_price', name: 'Premium Short Clip', desc: 'Flat fee to export a premium manual clip' },
+          ].map((cp) => (
             <div
               key={cp.id}
               style={{
@@ -224,32 +150,9 @@ export const PricingView = () => {
               }}
             >
               <div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span
-                    style={{
-                      fontSize: '0.7rem',
-                      fontWeight: 700,
-                      color: 'var(--accent-cyan)',
-                      background: 'rgba(0, 229, 255, 0.1)',
-                      padding: '2px 8px',
-                      borderRadius: 4,
-                    }}
-                  >
-                    {cp.category}
-                  </span>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.75rem', color: 'var(--text-muted)', cursor: 'pointer' }}>
-                    <input
-                      type="checkbox"
-                      checked={cp.isLive}
-                      onChange={() => handleToggleRule(cp.id)}
-                    />
-                    Live
-                  </label>
-                </div>
-
-                <h4 style={{ fontSize: '1rem', fontWeight: 700, color: '#FFF', marginTop: 10 }}>{cp.name}</h4>
+                <h4 style={{ fontSize: '1rem', fontWeight: 700, color: '#FFF' }}>{cp.name}</h4>
                 <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: 4, lineHeight: 1.3 }}>
-                  {cp.description}
+                  {cp.desc}
                 </p>
               </div>
 
@@ -259,8 +162,8 @@ export const PricingView = () => {
                   <span style={{ color: 'var(--primary-neon)', fontWeight: 700 }}>₹</span>
                   <input
                     type="number"
-                    value={cp.basePriceInr}
-                    onChange={(e) => handleUpdatePrice(cp.id, Number(e.target.value))}
+                    value={pricingConfig[cp.id as keyof typeof pricingConfig]}
+                    onChange={(e) => handleUpdatePrice(cp.id as keyof typeof pricingConfig, Number(e.target.value))}
                     style={{
                       width: 80,
                       background: 'rgba(0,0,0,0.4)',
@@ -280,79 +183,7 @@ export const PricingView = () => {
         </div>
       </div>
 
-      {/* Section 2: Subscription Membership Tiers */}
-      <div className="glass-card" style={{ padding: 24, display: 'flex', flexDirection: 'column', gap: 16 }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <div>
-            <h3 style={{ fontSize: '1.15rem', fontWeight: 700, color: '#FFFFFF', display: 'flex', alignItems: 'center', gap: 8 }}>
-              <Layers size={20} color="var(--accent-purple)" />
-              Athlete Subscription Membership Tiers
-            </h3>
-            <p style={{ color: 'var(--text-muted)', fontSize: '0.8rem', marginTop: 2 }}>
-              Recurring recurring plans granting monthly match quotas and priority NVR extraction
-            </p>
-          </div>
-          <span className="badge-neon purple">{subscriptions.reduce((a, s) => a + s.activeSubscribersCount, 0)} Total Active Subscribers</span>
-        </div>
-
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: 16 }}>
-          {subscriptions.map((sub) => (
-            <div
-              key={sub.id}
-              style={{
-                background: 'linear-gradient(135deg, rgba(179, 136, 255, 0.04) 0%, rgba(18, 24, 34, 0.7) 100%)',
-                border: '1px solid rgba(179, 136, 255, 0.2)',
-                borderRadius: 'var(--radius-md)',
-                padding: 20,
-                display: 'flex',
-                flexDirection: 'column',
-                justifyContent: 'space-between',
-                gap: 16,
-              }}
-            >
-              <div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--accent-purple)', textTransform: 'uppercase' }}>
-                    {sub.billingCycle} PLAN
-                  </span>
-                  <span style={{ fontSize: '0.75rem', color: 'var(--text-dim)', fontWeight: 600 }}>
-                    {sub.activeSubscribersCount} athletes enrolled
-                  </span>
-                </div>
-
-                <h4 style={{ fontSize: '1.15rem', fontWeight: 800, color: '#FFF', marginTop: 8 }}>{sub.title}</h4>
-                <div style={{ fontSize: '1.6rem', fontWeight: 800, color: 'var(--primary-neon)', marginTop: 4 }}>
-                  ₹{sub.priceInr}
-                  <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 400 }}> / {sub.billingCycle.toLowerCase()}</span>
-                </div>
-
-                <div style={{ marginTop: 14, display: 'flex', flexDirection: 'column', gap: 8, fontSize: '0.8rem' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: '#FFF' }}>
-                    <CheckCircle2 size={14} color="var(--primary-neon)" />
-                    <span><strong>{sub.includedMatches}</strong> Full Match Recordings / month</span>
-                  </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: '#FFF' }}>
-                    <CheckCircle2 size={14} color="var(--primary-neon)" />
-                    <span><strong>{sub.aiHighlightsPerMonth}</strong> AI Highlight Clips / month</span>
-                  </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: '#FFF' }}>
-                    <CheckCircle2 size={14} color="var(--primary-neon)" />
-                    <span>4K Ultra-HD Raw Download Support</span>
-                  </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: '#FFF' }}>
-                    <CheckCircle2 size={14} color="var(--primary-neon)" />
-                    <span>VIP Priority NVR Render Queue</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* Section 3: Taxes, Gateway & Dynamic Surge Rules */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
-        {/* Taxes & Surcharges */}
         <div className="glass-card" style={{ padding: 20, display: 'flex', flexDirection: 'column', gap: 16 }}>
           <h3 style={{ fontSize: '1.05rem', fontWeight: 700, color: '#FFF', display: 'flex', alignItems: 'center', gap: 8 }}>
             <Percent size={18} color="var(--accent-amber)" />
@@ -363,16 +194,16 @@ export const PricingView = () => {
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <div>
                 <div style={{ fontSize: '0.85rem', fontWeight: 600, color: '#FFF' }}>Goods & Services Tax (GST)</div>
-                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Standard Indian digital services tax rate</div>
+                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Tax rate applied to base price (e.g., 0.18 for 18%)</div>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                 <input
                   type="number"
-                  value={gstRate}
-                  onChange={(e) => setGstRate(Number(e.target.value))}
+                  step="0.01"
+                  value={pricingConfig.gst_rate}
+                  onChange={(e) => handleUpdatePrice('gst_rate', Number(e.target.value))}
                   style={{ width: 60, background: 'rgba(0,0,0,0.4)', border: '1px solid var(--border-subtle)', borderRadius: 6, padding: '4px 8px', color: '#FFF', textAlign: 'right' }}
                 />
-                <span style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>%</span>
               </div>
             </div>
 
@@ -406,42 +237,6 @@ export const PricingView = () => {
                   style={{ width: 60, background: 'rgba(0,0,0,0.4)', border: '1px solid var(--border-subtle)', borderRadius: 6, padding: '4px 8px', color: '#FFF', textAlign: 'right' }}
                 />
               </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Dynamic Weekend Surge Rules */}
-        <div className="glass-card" style={{ padding: 20, display: 'flex', flexDirection: 'column', gap: 16 }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <h3 style={{ fontSize: '1.05rem', fontWeight: 700, color: '#FFF', display: 'flex', alignItems: 'center', gap: 8 }}>
-              <Zap size={18} color="var(--accent-cyan)" />
-              Dynamic Peak & Weekend Surge
-            </h3>
-            <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.8rem', color: '#FFF', cursor: 'pointer' }}>
-              <input
-                type="checkbox"
-                checked={weekendSurgeActive}
-                onChange={() => setWeekendSurgeActive(!weekendSurgeActive)}
-              />
-              Enable Surge
-            </label>
-          </div>
-
-          <p style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>
-            Automatically apply weekend & prime-time match extraction demand pricing (Saturday - Sunday 6 PM - 11 PM).
-          </p>
-
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'rgba(0,0,0,0.3)', padding: 12, borderRadius: 'var(--radius-sm)' }}>
-            <span style={{ fontSize: '0.85rem', color: '#FFF', fontWeight: 600 }}>Prime Time Surge Percentage</span>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-              <span style={{ color: 'var(--primary-neon)', fontWeight: 700 }}>+</span>
-              <input
-                type="number"
-                value={weekendSurgePercent}
-                onChange={(e) => setWeekendSurgePercent(Number(e.target.value))}
-                style={{ width: 60, background: 'rgba(0,0,0,0.4)', border: '1px solid var(--border-subtle)', borderRadius: 6, padding: '4px 8px', color: '#FFF', textAlign: 'right' }}
-              />
-              <span style={{ color: 'var(--text-muted)' }}>%</span>
             </div>
           </div>
         </div>

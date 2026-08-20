@@ -464,5 +464,24 @@ export const AdminApi = {
     const res = await api.post('/admin/notifications/broadcast', data);
     return extractData<any>(res);
   },
+
+  // 9. Pricing & Configuration
+  async getPricingConfig(): Promise<any> {
+    const res = await api.get('/pricing/config');
+    return extractData<any>(res);
+  },
+
+  async updatePricingConfig(data: {
+    cricket_hourly_rate?: number;
+    pickleball_hourly_rate?: number;
+    padel_hourly_rate?: number;
+    default_hourly_rate?: number;
+    highlight_base_price?: number;
+    shorts_base_price?: number;
+    gst_rate?: number;
+  }): Promise<any> {
+    const res = await api.put('/admin/pricing/config', data);
+    return extractData<any>(res);
+  },
 };
 
