@@ -21,6 +21,21 @@ import { CompactDateBadge } from '../components/CompactDateBadge';
 import { LiveStreamModal } from '../components/LiveStreamModal';
 import type { Tournament, VenueFleet, CourtCamera, TournamentLiveStream } from '../types';
 
+export const getChannelForCourt = (venueName: string, courtNumber: number | undefined | null, isCh2: boolean): number => {
+  if (venueName.toLowerCase().includes('botanical')) {
+    switch (courtNumber) {
+      case 1: return isCh2 ? 7 : 6;
+      case 2: return isCh2 ? 12 : 4;
+      case 3: return isCh2 ? 9 : 8;
+      case 4: return isCh2 ? 11 : 5;
+      case 5: return isCh2 ? 3 : 2;
+      case 6: return isCh2 ? 10 : 1;
+      default: return isCh2 ? 2 : 1;
+    }
+  }
+  return isCh2 ? 2 : 1;
+};
+
 export const TournamentsView = () => {
   const [tournaments, setTournaments] = useState<Tournament[]>([]);
   const [fleet, setFleet] = useState<VenueFleet[]>([]);
@@ -84,7 +99,6 @@ export const TournamentsView = () => {
   const handleStartStream = async (tournament: Tournament, cameraId: string) => {
     const isCh2 = cameraId.endsWith('_ch2');
     const baseCameraId = cameraId.replace('_ch1', '').replace('_ch2', '');
-    const channel = isCh2 ? 2 : 1;
     
     const match = findCourtInFleet(baseCameraId);
     if (!match) {
@@ -92,6 +106,8 @@ export const TournamentsView = () => {
       return;
     }
     const { court, venue } = match;
+    const channel = getChannelForCourt(venue.turfName, court.courtNumber, isCh2);
+
     if (!court.raspberryPiBaseUrl?.trim()) {
       alert(`${court.name} is not configured with a Pi URL. Configure it in Camera Fleet first.`);
       return;
@@ -99,7 +115,7 @@ export const TournamentsView = () => {
 
     setStreamLoadingId(cameraId);
     try {
-      const res = await AdminApi.startLiveStream(baseCameraId, `${venue.turfName} ${court.name}`, channel);
+      const res = await AdminApi.startLiveStream(baseCameraId, `${venue.turfName} ${court.name} (Ch ${channel})`, channel);
       const playbackUrl = res.playbackUrl || `https://stream.mux.com/live-${baseCameraId}.m3u8`;
       const existing = tournament.liveStreams ?? [];
       const nextStreams: TournamentLiveStream[] = [
@@ -128,7 +144,12 @@ export const TournamentsView = () => {
   const handleStopStream = async (tournament: Tournament, cameraId: string) => {
     const isCh2 = cameraId.endsWith('_ch2');
     const baseCameraId = cameraId.replace('_ch1', '').replace('_ch2', '');
-    const channel = isCh2 ? 2 : 1;
+    
+    const match = findCourtInFleet(baseCameraId);
+    let channel = isCh2 ? 2 : 1;
+    if (match) {
+      channel = getChannelForCourt(match.venue.turfName, match.court.courtNumber, isCh2);
+    }
 
     setStreamLoadingId(cameraId);
     try {
@@ -181,15 +202,19 @@ export const TournamentsView = () => {
     setUploadingImage(true);
     try {
       const key = `tournaments/banners/${Date.now()}_${file.name.replace(/[^a-zA-Z0-9.]/g, '_')}`;
-      const presignedUrl = await AdminApi.getPresignedUrl(key, 'fieldflix-dev-media');
+      const presignedUrl = await AdminApi.getPresignedUrl(key, 'fieldflicks-media-assets', file.type);
       
-      await fetch(presignedUrl, {
+      const uploadRes = await fetch(presignedUrl, {
         method: 'PUT',
         body: file,
         headers: {
           'Content-Type': file.type
         }
       });
+
+      if (!uploadRes.ok) {
+        throw new Error(`Upload failed with status ${uploadRes.status}`);
+      }
       
       const finalUrl = presignedUrl.split('?')[0];
       setFormData(prev => ({ ...prev, bannerImage: finalUrl }));
@@ -233,6 +258,18 @@ export const TournamentsView = () => {
       );
     } catch (err: any) {
       alert(err.response?.data?.message || 'Failed to update tournament status');
+    }
+  };
+
+  const handleDeleteTournament = async (id: string) => {
+    if (!window.confirm('Are you sure you want to delete this tournament? This cannot be undone.')) {
+      return;
+    }
+    try {
+      await AdminApi.deleteTournament(id);
+      setTournaments((prev) => prev.filter((t) => t.id !== id));
+    } catch (err: any) {
+      alert(err.response?.data?.message || 'Failed to delete tournament');
     }
   };
 
@@ -603,6 +640,13 @@ export const TournamentsView = () => {
                 ) : (
                   <span style={{ fontSize: '0.75rem', color: 'var(--text-dim)' }}>Archive mode</span>
                 )}
+                <button
+                  onClick={() => handleDeleteTournament(t.id)}
+                  className="btn-secondary"
+                  style={{ padding: '8px 12px', fontSize: '0.8rem', color: 'var(--accent-crimson)' }}
+                >
+                  Delete
+                </button>
               </div>
             </div>
           ))}

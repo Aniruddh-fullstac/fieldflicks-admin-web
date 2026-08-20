@@ -172,6 +172,11 @@ export const AdminApi = {
     return extractData<Tournament>(res);
   },
 
+  async deleteTournament(id: string): Promise<any> {
+    const res = await api.delete(`/tournaments/${id}`);
+    return extractData<any>(res);
+  },
+
   // 4. Coupons & Free Games: Real discount codes and assignments
   async listCoupons(): Promise<CouponItem[]> {
     const res = await api.get('/coupons');
@@ -484,12 +489,18 @@ export const AdminApi = {
     return extractData<any>(res);
   },
 
-  async getPresignedUrl(key: string, bucketName?: string): Promise<string> {
-    const res = await api.get('/file-service/presigned-url', {
-      params: { key, bucketName }
+  async getPresignedUrl(key: string, bucketName?: string, contentType?: string): Promise<string> {
+    const res = await api.post('/file-service/uploads', {
+      files: [
+        {
+          fileName: key,
+          contentType: contentType || 'application/octet-stream', // dynamically passed content type
+        }
+      ],
+      bucketName: bucketName || 'fieldflicks-media-assets'
     });
-    // @ts-ignore
-    return res?.data?.presignedUrl || extractData<any>(res)?.presignedUrl || '';
+    const data = extractData<any[]>(res);
+    return data?.[0]?.url || '';
   },
 };
 

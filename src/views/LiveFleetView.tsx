@@ -31,6 +31,8 @@ import {
 } from '../components/DiagnosticErrorModal';
 import type { VenueFleet, CourtCamera } from '../types';
 
+import { getChannelForCourt } from './TournamentsView';
+
 export const LiveFleetView = () => {
   const [fleet, setFleet] = useState<VenueFleet[]>([]);
   const [loading, setLoading] = useState(true);
@@ -94,7 +96,7 @@ export const LiveFleetView = () => {
 
 
 
-  const handleStartStream = async (court: CourtCamera, venue: VenueFleet, channel?: number) => {
+  const handleStartStream = async (court: CourtCamera, venue: VenueFleet, channelIdx?: number) => {
     // STREAMING GUARD: Immediately notify if court isn't configured
     const isConfigured = !!(court.raspberryPiBaseUrl && court.raspberryPiBaseUrl.trim().length > 0);
     if (!isConfigured) {
@@ -106,11 +108,12 @@ export const LiveFleetView = () => {
       return;
     }
 
-    const loadId = channel ? `${court.cameraId}-ch${channel}` : court.cameraId;
+    const loadId = channelIdx ? `${court.cameraId}-ch${channelIdx}` : court.cameraId;
+    const actualChannel = getChannelForCourt(venue.turfName, court.courtNumber, channelIdx === 2);
     setActionLoadingId(loadId);
     try {
-      const courtTitle = channel ? `${venue.turfName} ${court.name} (Ch ${channel})` : `${venue.turfName} ${court.name}`;
-      const res = await AdminApi.startLiveStream(court.cameraId, courtTitle, channel);
+      const courtTitle = channelIdx ? `${venue.turfName} ${court.name} (Ch ${actualChannel})` : `${venue.turfName} ${court.name}`;
+      const res = await AdminApi.startLiveStream(court.cameraId, courtTitle, actualChannel);
       const playbackUrl = res.playbackUrl || `https://stream.mux.com/live-${court.cameraId}.m3u8`;
 
       // Update fleet state
@@ -152,11 +155,12 @@ export const LiveFleetView = () => {
     }
   };
 
-  const handleStopStream = async (court: CourtCamera, venueName: string, channel?: number) => {
-    const loadId = channel ? `${court.cameraId}-ch${channel}` : court.cameraId;
+  const handleStopStream = async (court: CourtCamera, venueName: string, channelIdx?: number) => {
+    const loadId = channelIdx ? `${court.cameraId}-ch${channelIdx}` : court.cameraId;
+    const actualChannel = getChannelForCourt(venueName, court.courtNumber, channelIdx === 2);
     setActionLoadingId(loadId);
     try {
-      await AdminApi.stopLiveStream(court.cameraId, channel);
+      await AdminApi.stopLiveStream(court.cameraId, actualChannel);
       setFleet((prev) =>
         prev.map((v) => ({
           ...v,
