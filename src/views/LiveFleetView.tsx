@@ -122,7 +122,7 @@ export const LiveFleetView = () => {
           ...v,
           courts: v.courts.map((c) => {
             if (c.cameraId !== court.cameraId) return c;
-            if (channel === 2) {
+            if (channelIdx === 2) {
               return { ...c, isLiveStreamingCh2: true, status: 'STREAMING', livePlaybackUrlCh2: playbackUrl };
             }
             return { ...c, isLiveStreaming: true, status: 'STREAMING', livePlaybackUrl: playbackUrl };
@@ -134,20 +134,20 @@ export const LiveFleetView = () => {
       setActiveModal({
         court: { 
           ...court, 
-          isLiveStreaming: channel !== 2 ? true : court.isLiveStreaming, 
-          livePlaybackUrl: channel !== 2 ? playbackUrl : court.livePlaybackUrl,
-          isLiveStreamingCh2: channel === 2 ? true : court.isLiveStreamingCh2,
-          livePlaybackUrlCh2: channel === 2 ? playbackUrl : court.livePlaybackUrlCh2,
+          isLiveStreaming: channelIdx !== 2 ? true : court.isLiveStreaming, 
+          livePlaybackUrl: channelIdx !== 2 ? playbackUrl : court.livePlaybackUrl,
+          isLiveStreamingCh2: channelIdx === 2 ? true : court.isLiveStreamingCh2,
+          livePlaybackUrlCh2: channelIdx === 2 ? playbackUrl : court.livePlaybackUrlCh2,
         },
         venueName: venue.turfName,
         playbackUrl,
-        playbackUrlCh2: channel === 2 ? playbackUrl : undefined,
+        playbackUrlCh2: channelIdx === 2 ? playbackUrl : undefined,
       });
       setActionLoadingId(null);
     } catch (err: any) {
       setActionLoadingId(null);
       const diag = parseDiagnosticError(err, {
-        courtName: `${venue.turfName} — ${court.name} ${channel ? '(Ch '+channel+')' : ''}`,
+        courtName: `${venue.turfName} — ${court.name} ${channelIdx ? '(Ch '+channelIdx+')' : ''}`,
         courtNumber: court.courtNumber,
         deviceUrl: court.raspberryPiBaseUrl,
       });
@@ -166,7 +166,7 @@ export const LiveFleetView = () => {
           ...v,
           courts: v.courts.map((c) => {
             if (c.cameraId !== court.cameraId) return c;
-            if (channel === 2) {
+            if (channelIdx === 2) {
               return { ...c, isLiveStreamingCh2: false, livePlaybackUrlCh2: undefined, status: c.isLiveStreaming ? 'STREAMING' : 'ONLINE' };
             }
             return { ...c, isLiveStreaming: false, livePlaybackUrl: undefined, status: c.isLiveStreamingCh2 ? 'STREAMING' : 'ONLINE' };
@@ -176,7 +176,7 @@ export const LiveFleetView = () => {
       if (activeModal && activeModal.court.cameraId === court.cameraId) {
         setActiveModal((prev) => {
           if (!prev) return null;
-          if (channel === 2) {
+          if (channelIdx === 2) {
             return { ...prev, court: { ...prev.court, isLiveStreamingCh2: false } };
           }
           return { ...prev, court: { ...prev.court, isLiveStreaming: false } };
