@@ -201,27 +201,19 @@ export const TournamentsView = () => {
     
     setUploadingImage(true);
     try {
-      const key = `tournaments/banners/${Date.now()}_${file.name.replace(/[^a-zA-Z0-9.]/g, '_')}`;
-      const presignedUrl = await AdminApi.getPresignedUrl(key, 'fieldflicks-media-assets', file.type);
-      
-      const uploadRes = await fetch(presignedUrl, {
-        method: 'PUT',
-        body: file,
-        headers: {
-          'Content-Type': file.type
-        }
-      });
-
-      if (!uploadRes.ok) {
-        throw new Error(`Upload failed with status ${uploadRes.status}`);
-      }
-      
-      const finalUrl = presignedUrl.split('?')[0];
-      setFormData(prev => ({ ...prev, bannerImage: finalUrl }));
-      
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        const base64String = reader.result as string;
+        setFormData((prev) => ({ ...prev, bannerImage: base64String }));
+        setUploadingImage(false);
+      };
+      reader.onerror = () => {
+        alert('Failed to read file as Base64');
+        setUploadingImage(false);
+      };
+      reader.readAsDataURL(file);
     } catch (err: any) {
-      alert('Failed to upload image: ' + (err.message || 'Unknown error'));
-    } finally {
+      alert(err.message || 'Failed to upload image');
       setUploadingImage(false);
     }
   };
