@@ -208,11 +208,14 @@ export const TournamentsView = () => {
     }
 
     const venue = fleet.find((v) => v.turfId === formData.turfId);
-    const liveStreams: TournamentLiveStream[] = formData.cameraIds.map((cameraId) => {
-      const court = venue?.courts.find((c) => c.cameraId === cameraId);
+    const liveStreams: TournamentLiveStream[] = formData.cameraIds.map((selectedId) => {
+      // selectedId is like "uuid_ch1" or "uuid_ch2"
+      const isCh2 = selectedId.endsWith('_ch2');
+      const baseCameraId = selectedId.replace('_ch1', '').replace('_ch2', '');
+      const court = venue?.courts.find((c) => c.cameraId === baseCameraId);
       return {
-        cameraId,
-        cameraName: court?.name || `Camera ${cameraId.slice(0, 6)}`,
+        cameraId: selectedId,
+        cameraName: (court?.name || `Camera ${baseCameraId.slice(0, 6)}`) + (isCh2 ? ' (Ch 2)' : ' (Ch 1)'),
         courtNumber: court?.courtNumber,
         isLive: false,
       };

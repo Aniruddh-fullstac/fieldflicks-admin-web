@@ -45,6 +45,7 @@ export const LiveFleetView = () => {
     playbackUrl: string;
     secondaryPlaybackUrl?: string;
     dualChannelNote?: string;
+    playbackUrlCh2?: string;
   } | null>(null);
 
   // Extract Recording Modal state
@@ -91,90 +92,9 @@ export const LiveFleetView = () => {
     fetchFleet();
   }, []);
 
-  const handleStartDualStream = async (court: CourtCamera, venue: VenueFleet) => {
-    const isConfigured = !!(court.raspberryPiBaseUrl && court.raspberryPiBaseUrl.trim().length > 0);
-    if (!isConfigured) {
-      setUnconfiguredWarning({ court, venueId: venue.turfId, venueName: venue.turfName });
-      return;
-    }
 
-    setActionLoadingId(`${court.cameraId}-dual`);
-    try {
-      const dual = await AdminApi.startDualLiveStream(
-        court.cameraId,
-        `${venue.turfName} ${court.name}`,
-        [1, 2],
-      );
-      const primary = dual.channels[0]?.result;
-      const secondary = dual.channels[1]?.result;
-      const playbackUrl =
-        primary?.playbackUrl || `https://stream.mux.com/live-${court.cameraId}.m3u8`;
 
-      setFleet((prev) =>
-        prev.map((v) => ({
-          ...v,
-          courts: v.courts.map((c) =>
-            c.cameraId === court.cameraId
-              ? { ...c, isLiveStreaming: true, status: 'STREAMING', livePlaybackUrl: playbackUrl }
-              : c
-          ),
-        }))
-      );
-
-      const secondaryPlaybackUrl = secondary?.playbackId ? `https://stream.mux.com/${secondary.playbackId}.m3u8` : undefined;
-
-      setActiveModal({
-        court: { ...court, isLiveStreaming: true, livePlaybackUrl: playbackUrl },
-        venueName: venue.turfName,
-        playbackUrl,
-        secondaryPlaybackUrl,
-        dualChannelNote:
-          dual.channels.length > 1
-            ? `NVR channels 1 & 2 active.`
-            : undefined,
-      });
-      setActionLoadingId(null);
-    } catch (err: any) {
-      setActionLoadingId(null);
-      const diag = parseDiagnosticError(err, {
-        courtName: `${venue.turfName} — ${court.name} (dual ch 1+2)`,
-        courtNumber: court.courtNumber,
-        deviceUrl: court.raspberryPiBaseUrl,
-      });
-      setDiagnosticError(diag);
-    }
-  };
-
-  const handleStopDualStream = async (court: CourtCamera, venueName: string) => {
-    setActionLoadingId(`${court.cameraId}-dual-stop`);
-    try {
-      await AdminApi.stopDualLiveStream(court.cameraId, [1, 2]);
-      setFleet((prev) =>
-        prev.map((v) => ({
-          ...v,
-          courts: v.courts.map((c) =>
-            c.cameraId === court.cameraId
-              ? { ...c, isLiveStreaming: false, status: 'ONLINE', livePlaybackUrl: undefined }
-              : c
-          ),
-        }))
-      );
-      if (activeModal?.court.cameraId === court.cameraId) {
-        setActiveModal(null);
-      }
-      setActionLoadingId(null);
-    } catch (err: any) {
-      setActionLoadingId(null);
-      const diag = parseDiagnosticError(err, {
-        courtName: `${venueName} — ${court.name} (dual stop)`,
-        courtNumber: court.courtNumber,
-        deviceUrl: court.raspberryPiBaseUrl,
-      });
-      setDiagnosticError(diag);
-    }
-  };
-
-  const handleStartStream = async (court: CourtCamera, venue: VenueFleet) => {
+  const handleStartStream = async (court: CourtCamera, venue: VenueFleet, channel?: number) => {
     // STREAMING GUARD: Immediately notify if court isn't configured
     const isConfigured = !!(court.raspberryPiBaseUrl && court.raspberryPiBaseUrl.trim().length > 0);
     if (!isConfigured) {
@@ -186,34 +106,45 @@ export const LiveFleetView = () => {
       return;
     }
 
-    setActionLoadingId(court.cameraId);
+    const loadId = channel ? `${court.cameraId}-ch${channel}` : court.cameraId;
+    setActionLoadingId(loadId);
     try {
-      const res = await AdminApi.startLiveStream(court.cameraId, `${venue.turfName} ${court.name}`);
+      const courtTitle = channel ? `${venue.turfName} ${court.name} (Ch ${channel})` : `${venue.turfName} ${court.name}`;
+      const res = await AdminApi.startLiveStream(court.cameraId, courtTitle, channel);
       const playbackUrl = res.playbackUrl || `https://stream.mux.com/live-${court.cameraId}.m3u8`;
 
       // Update fleet state
       setFleet((prev) =>
         prev.map((v) => ({
           ...v,
-          courts: v.courts.map((c) =>
-            c.cameraId === court.cameraId
-              ? { ...c, isLiveStreaming: true, status: 'STREAMING', livePlaybackUrl: playbackUrl }
-              : c
-          ),
+          courts: v.courts.map((c) => {
+            if (c.cameraId !== court.cameraId) return c;
+            if (channel === 2) {
+              return { ...c, isLiveStreamingCh2: true, status: 'STREAMING', livePlaybackUrlCh2: playbackUrl };
+            }
+            return { ...c, isLiveStreaming: true, status: 'STREAMING', livePlaybackUrl: playbackUrl };
+          }),
         }))
       );
 
       // Open stream player modal
       setActiveModal({
-        court: { ...court, isLiveStreaming: true, livePlaybackUrl: playbackUrl },
+        court: { 
+          ...court, 
+          isLiveStreaming: channel !== 2 ? true : court.isLiveStreaming, 
+          livePlaybackUrl: channel !== 2 ? playbackUrl : court.livePlaybackUrl,
+          isLiveStreamingCh2: channel === 2 ? true : court.isLiveStreamingCh2,
+          livePlaybackUrlCh2: channel === 2 ? playbackUrl : court.livePlaybackUrlCh2,
+        },
         venueName: venue.turfName,
         playbackUrl,
+        playbackUrlCh2: channel === 2 ? playbackUrl : undefined,
       });
       setActionLoadingId(null);
     } catch (err: any) {
       setActionLoadingId(null);
       const diag = parseDiagnosticError(err, {
-        courtName: `${venue.turfName} — ${court.name}`,
+        courtName: `${venue.turfName} — ${court.name} ${channel ? '(Ch '+channel+')' : ''}`,
         courtNumber: court.courtNumber,
         deviceUrl: court.raspberryPiBaseUrl,
       });
@@ -221,22 +152,31 @@ export const LiveFleetView = () => {
     }
   };
 
-  const handleStopStream = async (court: CourtCamera, venueName: string) => {
-    setActionLoadingId(court.cameraId);
+  const handleStopStream = async (court: CourtCamera, venueName: string, channel?: number) => {
+    const loadId = channel ? `${court.cameraId}-ch${channel}` : court.cameraId;
+    setActionLoadingId(loadId);
     try {
-      await AdminApi.stopLiveStream(court.cameraId);
+      await AdminApi.stopLiveStream(court.cameraId, channel);
       setFleet((prev) =>
         prev.map((v) => ({
           ...v,
-          courts: v.courts.map((c) =>
-            c.cameraId === court.cameraId
-              ? { ...c, isLiveStreaming: false, status: 'ONLINE', livePlaybackUrl: undefined }
-              : c
-          ),
+          courts: v.courts.map((c) => {
+            if (c.cameraId !== court.cameraId) return c;
+            if (channel === 2) {
+              return { ...c, isLiveStreamingCh2: false, livePlaybackUrlCh2: undefined, status: c.isLiveStreaming ? 'STREAMING' : 'ONLINE' };
+            }
+            return { ...c, isLiveStreaming: false, livePlaybackUrl: undefined, status: c.isLiveStreamingCh2 ? 'STREAMING' : 'ONLINE' };
+          }),
         }))
       );
-      if (activeModal?.court.cameraId === court.cameraId) {
-        setActiveModal(null);
+      if (activeModal && activeModal.court.cameraId === court.cameraId) {
+        setActiveModal((prev) => {
+          if (!prev) return null;
+          if (channel === 2) {
+            return { ...prev, court: { ...prev.court, isLiveStreamingCh2: false } };
+          }
+          return { ...prev, court: { ...prev.court, isLiveStreaming: false } };
+        });
       }
       setActionLoadingId(null);
     } catch (err: any) {
@@ -604,7 +544,7 @@ export const LiveFleetView = () => {
                           <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                           <div style={{ display: 'flex', gap: 6 }}>
                             <button
-                              onClick={() => handleStartStream(court, venue)}
+                              onClick={() => handleStartStream(court, venue, 1)}
                               disabled={isActionLoading}
                               className="btn-primary"
                               style={{
@@ -618,23 +558,23 @@ export const LiveFleetView = () => {
                                 opacity: isActionLoading ? 0.7 : 1,
                               }}
                             >
-                              {isActionLoading ? (
+                              {actionLoadingId === `${court.cameraId}-ch1` || actionLoadingId === court.cameraId ? (
                                 <>
                                   <RefreshCw size={13} className="spin" />
-                                  Starting...
+                                  ...
                                 </>
                               ) : (
                                 <>
-                                  <Radio size={13} /> Live Stream
+                                  <Radio size={13} /> Live Stream (Ch 1)
                                 </>
                               )}
                             </button>
 
                             <button
-                              onClick={() => handleStopStream(court, venue.turfName)}
+                              onClick={() => handleStopStream(court, venue.turfName, 1)}
                               disabled={isActionLoading}
                               className="btn-secondary"
-                              title="Force Stop Stalled Stream"
+                              title="Force Stop Stalled Stream Ch 1"
                               style={{
                                 padding: '10px 10px',
                                 color: 'var(--accent-crimson)',
@@ -691,35 +631,57 @@ export const LiveFleetView = () => {
                               <Settings size={13} />
                             </button>
                           </div>
-                          <button
-                            onClick={() => handleStartDualStream(court, venue)}
-                            disabled={isActionLoading}
-                            className="btn-secondary"
-                            title="Start NVR channels 1 & 2 on the same Pi (dual-camera court)"
-                            style={{
-                              width: '100%',
-                              padding: '8px 10px',
-                              fontSize: '0.72rem',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              gap: 6,
-                              color: 'var(--accent-cyan)',
-                              borderColor: 'rgba(0, 229, 255, 0.35)',
-                              opacity: isActionLoading ? 0.7 : 1,
-                            }}
-                          >
-                            {actionLoadingId === `${court.cameraId}-dual` ? (
-                              <>
-                                <RefreshCw size={12} className="spin" />
-                                Starting dual stream...
-                              </>
-                            ) : (
-                              <>
-                                <RadioTower size={12} /> Dual Stream (NVR Ch 1 + 2)
-                              </>
-                            )}
-                          </button>
+
+                          {(venue.turfName.toLowerCase().includes('pickpad') || court.isLiveStreamingCh2 || true) && (
+                            <div style={{ display: 'flex', gap: 6 }}>
+                              <button
+                                onClick={() => handleStartStream(court, venue, 2)}
+                                disabled={isActionLoading}
+                                className="btn-secondary"
+                                title="Start NVR channel 2"
+                                style={{
+                                  flex: 1,
+                                  padding: '8px 10px',
+                                  fontSize: '0.72rem',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  gap: 6,
+                                  color: 'var(--accent-cyan)',
+                                  borderColor: 'rgba(0, 229, 255, 0.35)',
+                                  opacity: isActionLoading ? 0.7 : 1,
+                                }}
+                              >
+                                {actionLoadingId === `${court.cameraId}-ch2` ? (
+                                  <>
+                                    <RefreshCw size={12} className="spin" />
+                                    Starting Ch 2...
+                                  </>
+                                ) : (
+                                  <>
+                                    <RadioTower size={12} /> Live Stream (Ch 2)
+                                  </>
+                                )}
+                              </button>
+                              <button
+                                onClick={() => handleStopStream(court, venue.turfName, 2)}
+                                disabled={isActionLoading}
+                                className="btn-secondary"
+                                title="Stop NVR channel 2"
+                                style={{
+                                  padding: '8px 10px',
+                                  color: 'var(--accent-crimson)',
+                                  borderColor: 'rgba(255, 61, 87, 0.4)',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  opacity: isActionLoading ? 0.6 : 1,
+                                }}
+                              >
+                                <Square size={13} fill="currentColor" />
+                              </button>
+                            </div>
+                          )}
                           </div>
                         ) : (
                           /* UNCONFIGURED COURT: Setup Pi button */
@@ -772,11 +734,7 @@ export const LiveFleetView = () => {
           secondaryPlaybackUrl={activeModal.secondaryPlaybackUrl}
           dualChannelNote={activeModal.dualChannelNote}
           onClose={() => setActiveModal(null)}
-          onStopStream={() =>
-            activeModal.dualChannelNote
-              ? handleStopDualStream(activeModal.court, activeModal.venueName)
-              : handleStopStream(activeModal.court, activeModal.venueName)
-          }
+          onStopStream={() => handleStopStream(activeModal.court, activeModal.venueName)}
         />
       )}
 

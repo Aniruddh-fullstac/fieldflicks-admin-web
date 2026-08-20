@@ -157,6 +157,8 @@ export interface CourtCamera {
   status: 'ONLINE' | 'OFFLINE' | 'RECORDING' | 'STREAMING' | 'UNCONFIGURED';
   isLiveStreaming?: boolean;
   livePlaybackUrl?: string;
+  isLiveStreamingCh2?: boolean;
+  livePlaybackUrlCh2?: string;
 }
 
 export interface VenueFleet {
