@@ -238,6 +238,17 @@ export const AdminApi = {
     return extractData<any>(res);
   },
 
+  async setVenuesAppVisibility(
+    turfIds: string[],
+    hiddenFromApp: boolean,
+  ): Promise<{ updatedTurfs: number; updatedCameras: number; hiddenFromApp: boolean }> {
+    const res = await api.put('/admin/venues/visibility', {
+      turfIds,
+      hidden_from_app: hiddenFromApp,
+    });
+    return extractData<any>(res);
+  },
+
   async createCameraMapping(data: {
     turfId: string;
     name?: string;

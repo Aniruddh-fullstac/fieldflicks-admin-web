@@ -165,10 +165,12 @@ export interface CourtCamera {
 
 export interface VenueFleet {
   turfId: string;
+  turfIds?: string[];
   turfName: string;
   city: string;
   address?: string;
   sportsSupported?: string[];
+  hiddenFromApp?: boolean;
   courtsCount: number;
   courts: CourtCamera[];
 }

@@ -17,6 +17,7 @@ import {
   Database,
   Sparkles,
   Link,
+  EyeOff,
 } from 'lucide-react';
 import { AdminApi } from '../services/api';
 import { SkeletonCardList } from '../components/Skeleton';
@@ -74,6 +75,55 @@ export const LiveFleetView = () => {
     venueId: string;
     venueName: string;
   } | null>(null);
+
+  const [selectedVenueIds, setSelectedVenueIds] = useState<Set<string>>(new Set());
+  const [bulkVisibilityLoading, setBulkVisibilityLoading] = useState(false);
+
+  const toggleVenueSelection = (turfId: string) => {
+    setSelectedVenueIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(turfId)) next.delete(turfId);
+      else next.add(turfId);
+      return next;
+    });
+  };
+
+  const toggleSelectAllVenues = () => {
+    if (selectedVenueIds.size === fleet.length) {
+      setSelectedVenueIds(new Set());
+    } else {
+      setSelectedVenueIds(new Set(fleet.map((v) => v.turfId)));
+    }
+  };
+
+  const applyVenueVisibility = async (turfIds: string[], hiddenFromApp: boolean) => {
+    if (turfIds.length === 0) return;
+    setBulkVisibilityLoading(true);
+    try {
+      await AdminApi.setVenuesAppVisibility(turfIds, hiddenFromApp);
+      setSelectedVenueIds(new Set());
+      fetchFleet();
+    } catch (err: any) {
+      alert(
+        err.response?.data?.message ||
+          err.message ||
+          'Failed to update venue visibility.',
+      );
+    } finally {
+      setBulkVisibilityLoading(false);
+    }
+  };
+
+  const handleVenueVisibilityToggle = async (venue: VenueFleet) => {
+    const hide = !venue.hiddenFromApp;
+    const confirmed = window.confirm(
+      hide
+        ? `Hide "${venue.turfName}" and all ${venue.courts?.length || 0} courts from the athlete app?`
+        : `Show "${venue.turfName}" and all its courts in the athlete app?`,
+    );
+    if (!confirmed) return;
+    await applyVenueVisibility([venue.turfId], hide);
+  };
 
   const fetchFleet = () => {
     setLoading(true);
@@ -305,6 +355,62 @@ export const LiveFleetView = () => {
         </div>
       </div>
 
+      {selectedVenueIds.size > 0 && (
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: 12,
+            padding: '12px 16px',
+            borderRadius: 'var(--radius-sm)',
+            border: '1px solid rgba(255, 171, 0, 0.35)',
+            backgroundColor: 'rgba(255, 171, 0, 0.08)',
+            flexWrap: 'wrap',
+          }}
+        >
+          <span style={{ fontSize: '0.85rem', color: '#FFFFFF', fontWeight: 600 }}>
+            {selectedVenueIds.size} venue{selectedVenueIds.size === 1 ? '' : 's'} selected
+          </span>
+          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+            <button
+              type="button"
+              disabled={bulkVisibilityLoading}
+              onClick={() => applyVenueVisibility(Array.from(selectedVenueIds), true)}
+              className="btn-secondary"
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 6,
+                padding: '8px 12px',
+                fontSize: '0.75rem',
+                borderColor: 'rgba(255, 171, 0, 0.5)',
+              }}
+            >
+              <EyeOff size={14} />
+              Hide from app
+            </button>
+            <button
+              type="button"
+              disabled={bulkVisibilityLoading}
+              onClick={() => applyVenueVisibility(Array.from(selectedVenueIds), false)}
+              className="btn-secondary"
+              style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 12px', fontSize: '0.75rem' }}
+            >
+              Show in app
+            </button>
+            <button
+              type="button"
+              onClick={() => setSelectedVenueIds(new Set())}
+              className="btn-secondary"
+              style={{ padding: '8px 12px', fontSize: '0.75rem' }}
+            >
+              Clear
+            </button>
+          </div>
+        </div>
+      )}
+
       {error && (
         <div style={{
           padding: 16,
@@ -362,6 +468,27 @@ export const LiveFleetView = () => {
         </div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+          {fleet.length > 0 && (
+            <label
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 8,
+                fontSize: '0.8rem',
+                color: 'var(--text-muted)',
+                cursor: 'pointer',
+                width: 'fit-content',
+              }}
+            >
+              <input
+                type="checkbox"
+                checked={selectedVenueIds.size === fleet.length && fleet.length > 0}
+                onChange={toggleSelectAllVenues}
+              />
+              Select all venues for bulk hide/show
+            </label>
+          )}
+
           {fleet.map((venue) => (
             <div key={venue.turfId} className="glass-card" style={{ padding: 24 }}>
               {/* Venue Header */}
@@ -375,18 +502,66 @@ export const LiveFleetView = () => {
                 flexWrap: 'wrap',
                 gap: 12,
               }}>
-                <div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
+                  <input
+                    type="checkbox"
+                    checked={selectedVenueIds.has(venue.turfId)}
+                    onChange={() => toggleVenueSelection(venue.turfId)}
+                    style={{ marginTop: 4 }}
+                    aria-label={`Select ${venue.turfName}`}
+                  />
+                  <div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
                     <h3 style={{ fontSize: '1.15rem', fontWeight: 700, color: '#FFFFFF' }}>{venue.turfName}</h3>
                     <span className="badge-neon green" style={{ fontSize: '0.65rem' }}>{venue.city}</span>
+                    {venue.hiddenFromApp && (
+                      <span
+                        style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: 4,
+                          fontSize: '0.6rem',
+                          fontWeight: 800,
+                          padding: '2px 7px',
+                          borderRadius: 100,
+                          backgroundColor: 'rgba(255, 171, 0, 0.15)',
+                          color: '#FFB300',
+                          border: '1px solid rgba(255, 171, 0, 0.35)',
+                          textTransform: 'uppercase',
+                          letterSpacing: '0.04em',
+                        }}
+                      >
+                        <EyeOff size={10} /> Hidden from app
+                      </span>
+                    )}
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: 4 }}>
                     <MapPin size={13} color="var(--primary-neon)" />
                     {venue.address || `${venue.turfName}, ${venue.city}`}
                   </div>
+                  </div>
                 </div>
 
-                <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
+                  <button
+                    type="button"
+                    disabled={bulkVisibilityLoading}
+                    onClick={() => handleVenueVisibilityToggle(venue)}
+                    className="btn-secondary"
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 6,
+                      padding: '6px 12px',
+                      fontSize: '0.75rem',
+                      borderColor: venue.hiddenFromApp
+                        ? 'rgba(255, 171, 0, 0.5)'
+                        : 'var(--border-subtle)',
+                    }}
+                  >
+                    <EyeOff size={13} />
+                    {venue.hiddenFromApp ? 'Show venue in app' : 'Hide venue from app'}
+                  </button>
                   <div style={{ display: 'flex', gap: 14, fontSize: '0.8rem' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 6, color: 'var(--text-muted)' }}>
                       <Cpu size={15} color="var(--primary-neon)" />
