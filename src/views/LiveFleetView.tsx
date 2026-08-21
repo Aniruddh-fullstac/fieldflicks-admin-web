@@ -178,6 +178,7 @@ export const LiveFleetView = () => {
         logicalChannel,
       );
       const playbackUrl = res.playbackUrl || `https://stream.mux.com/live-${court.cameraId}.m3u8`;
+      const liveStreamId = res.liveStreamId as string | undefined;
 
       // Update fleet state
       setFleet((prev) =>
@@ -186,9 +187,21 @@ export const LiveFleetView = () => {
           courts: v.courts.map((c) => {
             if (c.cameraId !== court.cameraId) return c;
             if (channelIdx === 2) {
-              return { ...c, isLiveStreamingCh2: true, status: 'STREAMING', livePlaybackUrlCh2: playbackUrl };
+              return {
+                ...c,
+                isLiveStreamingCh2: true,
+                status: 'STREAMING',
+                livePlaybackUrlCh2: playbackUrl,
+                liveStreamIdCh2: liveStreamId,
+              };
             }
-            return { ...c, isLiveStreaming: true, status: 'STREAMING', livePlaybackUrl: playbackUrl };
+            return {
+              ...c,
+              isLiveStreaming: true,
+              status: 'STREAMING',
+              livePlaybackUrl: playbackUrl,
+              liveStreamId,
+            };
           }),
         }))
       );
@@ -207,6 +220,9 @@ export const LiveFleetView = () => {
         playbackUrlCh2: channelIdx === 2 ? playbackUrl : undefined,
       });
       setActionLoadingId(null);
+      if (res?.warning) {
+        alert(String(res.warning));
+      }
     } catch (err: any) {
       setActionLoadingId(null);
       const diag = parseDiagnosticError(err, {
@@ -224,16 +240,35 @@ export const LiveFleetView = () => {
     const logicalChannel = channelIdx === 2 ? 2 : channelIdx === 1 ? 1 : undefined;
     setActionLoadingId(loadId);
     try {
-      const res = await AdminApi.stopLiveStream(court.cameraId, actualChannel, logicalChannel);
+      const liveStreamId =
+        channelIdx === 2 ? court.liveStreamIdCh2 : court.liveStreamId;
+      const res = await AdminApi.stopLiveStream(
+        court.cameraId,
+        actualChannel,
+        logicalChannel,
+        liveStreamId,
+      );
       setFleet((prev) =>
         prev.map((v) => ({
           ...v,
           courts: v.courts.map((c) => {
             if (c.cameraId !== court.cameraId) return c;
             if (channelIdx === 2) {
-              return { ...c, isLiveStreamingCh2: false, livePlaybackUrlCh2: undefined, status: c.isLiveStreaming ? 'STREAMING' : 'ONLINE' };
+              return {
+                ...c,
+                isLiveStreamingCh2: false,
+                livePlaybackUrlCh2: undefined,
+                liveStreamIdCh2: undefined,
+                status: c.isLiveStreaming ? 'STREAMING' : 'ONLINE',
+              };
             }
-            return { ...c, isLiveStreaming: false, livePlaybackUrl: undefined, status: c.isLiveStreamingCh2 ? 'STREAMING' : 'ONLINE' };
+            return {
+              ...c,
+              isLiveStreaming: false,
+              livePlaybackUrl: undefined,
+              liveStreamId: undefined,
+              status: c.isLiveStreamingCh2 ? 'STREAMING' : 'ONLINE',
+            };
           }),
         }))
       );

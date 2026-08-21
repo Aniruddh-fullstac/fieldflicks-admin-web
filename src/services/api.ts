@@ -385,11 +385,13 @@ export const AdminApi = {
     cameraId: string,
     channel?: number,
     logicalChannel?: 1 | 2,
+    liveStreamId?: string,
   ): Promise<any> {
     const res = await api.post('/recording/stop-live-stream', {
       cameraId,
       ...(channel != null ? { channel } : {}),
       ...(logicalChannel != null ? { logicalChannel } : {}),
+      ...(liveStreamId ? { liveStreamId } : {}),
     });
     return extractData<any>(res);
   },

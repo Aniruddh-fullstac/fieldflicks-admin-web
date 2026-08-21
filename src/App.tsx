@@ -29,7 +29,13 @@ export function App() {
     return !!localStorage.getItem('fieldflix_admin_token');
   });
   
-  const [activeTab, setActiveTab] = useState('overview');
+  const [activeTab, setActiveTab] = useState(() => {
+    return localStorage.getItem('fieldflix_admin_tab') || 'overview';
+  });
+
+  useEffect(() => {
+    localStorage.setItem('fieldflix_admin_tab', activeTab);
+  }, [activeTab]);
   const [searchTerm, setSearchTerm] = useState('');
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const [watchStreamId, setWatchStreamId] = useState<string | null>(null);

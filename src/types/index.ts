@@ -161,6 +161,8 @@ export interface CourtCamera {
   livePlaybackUrl?: string;
   isLiveStreamingCh2?: boolean;
   livePlaybackUrlCh2?: string;
+  liveStreamId?: string;
+  liveStreamIdCh2?: string;
 }
 
 export interface VenueFleet {
