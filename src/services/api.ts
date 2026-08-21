@@ -216,7 +216,7 @@ export const AdminApi = {
 
   async updateCameraMapping(
     cameraId: string,
-    data: { name?: string; court_number?: number; raspberryPiBaseUrl?: string }
+    data: { name?: string; court_number?: number; raspberryPiBaseUrl?: string; raspberryPiApiKey?: string }
   ): Promise<any> {
     const res = await api.put(`/admin/cameras/${cameraId}`, data);
     return extractData<any>(res);
@@ -227,6 +227,7 @@ export const AdminApi = {
     name?: string;
     court_number?: number;
     raspberryPiBaseUrl?: string;
+    raspberryPiApiKey?: string;
   }): Promise<any> {
     const res = await api.post('/admin/cameras', data);
     return extractData<any>(res);

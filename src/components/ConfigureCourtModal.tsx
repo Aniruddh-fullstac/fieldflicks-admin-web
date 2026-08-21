@@ -33,6 +33,7 @@ export const ConfigureCourtModal: React.FC<ConfigureCourtModalProps> = ({
   const [name, setName] = useState(court?.name || '');
   const [courtNumber, setCourtNumber] = useState<number>(court?.courtNumber ?? 1);
   const [piUrl, setPiUrl] = useState(court?.raspberryPiBaseUrl || '');
+  const [piApiKey, setPiApiKey] = useState(court?.raspberryPiApiKey || '');
 
   const [isSaving, setIsSaving] = useState(false);
   const [isTesting, setIsTesting] = useState(false);
@@ -84,6 +85,7 @@ export const ConfigureCourtModal: React.FC<ConfigureCourtModalProps> = ({
           name: name.trim() || `Court ${courtNumber}`,
           court_number: courtNumber,
           raspberryPiBaseUrl: piUrl.trim() || undefined,
+          raspberryPiApiKey: piApiKey.trim() || undefined,
         });
       } else {
         await AdminApi.createCameraMapping({
@@ -91,6 +93,7 @@ export const ConfigureCourtModal: React.FC<ConfigureCourtModalProps> = ({
           name: name.trim() || `Court ${courtNumber}`,
           court_number: courtNumber,
           raspberryPiBaseUrl: piUrl.trim() || undefined,
+          raspberryPiApiKey: piApiKey.trim() || undefined,
         });
       }
       onSaved();
@@ -387,6 +390,64 @@ export const ConfigureCourtModal: React.FC<ConfigureCourtModalProps> = ({
                 Court 11 Tailscale Gateway (:8443)
               </button>
             </div>
+          </div>
+
+          {/* Custom X-API-KEY */}
+          <div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+              <label
+                style={{
+                  fontSize: '0.75rem',
+                  fontWeight: 600,
+                  color: 'var(--text-muted)',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.04em',
+                }}
+              >
+                X-API-KEY (Optional)
+              </label>
+            </div>
+            <div style={{ position: 'relative' }}>
+              <div
+                style={{
+                  position: 'absolute',
+                  left: 14,
+                  top: '50%',
+                  transform: 'translateY(-50%)',
+                  color: 'var(--text-muted)',
+                }}
+              >
+                <ShieldCheck size={18} />
+              </div>
+              <input
+                type="text"
+                placeholder="Custom API Key for Edge Node"
+                value={piApiKey}
+                onChange={(e) => setPiApiKey(e.target.value)}
+                style={{
+                  width: '100%',
+                  padding: '10px 14px 10px 42px',
+                  backgroundColor: 'rgba(255, 255, 255, 0.04)',
+                  border: '1px solid var(--border-subtle)',
+                  borderRadius: 'var(--radius-sm)',
+                  color: '#FFFFFF',
+                  fontSize: '0.9rem',
+                  outline: 'none',
+                }}
+              />
+            </div>
+            <p
+              style={{
+                fontSize: '0.75rem',
+                color: 'var(--text-muted)',
+                marginTop: 8,
+                display: 'flex',
+                alignItems: 'center',
+                gap: 6,
+              }}
+            >
+              Overrides the global API key. Essential for custom nodes like cpu.taild82368.ts.net
+            </p>
           </div>
 
           {/* Test Connectivity Result Box */}
