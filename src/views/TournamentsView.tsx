@@ -122,7 +122,12 @@ export const TournamentsView = () => {
 
     setStreamLoadingId(cameraId);
     try {
-      const res = await AdminApi.startLiveStream(baseCameraId, `${venue.turfName} ${court.name} (Ch ${channel})`, channel);
+      const res = await AdminApi.startLiveStream(
+        baseCameraId,
+        `${venue.turfName} ${court.name} (Ch ${channel})`,
+        channel,
+        isCh2 ? 2 : 1,
+      );
       const playbackUrl = res.playbackUrl || `https://stream.mux.com/live-${baseCameraId}.m3u8`;
       const existing = tournament.liveStreams ?? [];
       const nextStreams: TournamentLiveStream[] = [
@@ -160,7 +165,7 @@ export const TournamentsView = () => {
 
     setStreamLoadingId(cameraId);
     try {
-      await AdminApi.stopLiveStream(baseCameraId, channel);
+      await AdminApi.stopLiveStream(baseCameraId, channel, isCh2 ? 2 : 1);
       const nextStreams = (tournament.liveStreams ?? []).map((s) =>
         s.cameraId === cameraId ? { ...s, isLive: false, playbackUrl: undefined } : s,
       );

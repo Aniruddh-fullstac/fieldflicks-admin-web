@@ -117,10 +117,16 @@ export const LiveFleetView = () => {
 
     const loadId = channelIdx ? `${court.cameraId}-ch${channelIdx}` : court.cameraId;
     const actualChannel = getChannelForCourt(venue.turfName, court.courtNumber, channelIdx === 2);
+    const logicalChannel = channelIdx === 2 ? 2 : channelIdx === 1 ? 1 : undefined;
     setActionLoadingId(loadId);
     try {
       const courtTitle = channelIdx ? `${venue.turfName} ${court.name} (Ch ${actualChannel})` : `${venue.turfName} ${court.name}`;
-      const res = await AdminApi.startLiveStream(court.cameraId, courtTitle, actualChannel);
+      const res = await AdminApi.startLiveStream(
+        court.cameraId,
+        courtTitle,
+        actualChannel,
+        logicalChannel,
+      );
       const playbackUrl = res.playbackUrl || `https://stream.mux.com/live-${court.cameraId}.m3u8`;
 
       // Update fleet state
@@ -165,9 +171,10 @@ export const LiveFleetView = () => {
   const handleStopStream = async (court: CourtCamera, venueName: string, channelIdx?: number) => {
     const loadId = channelIdx ? `${court.cameraId}-ch${channelIdx}` : court.cameraId;
     const actualChannel = getChannelForCourt(venueName, court.courtNumber, channelIdx === 2);
+    const logicalChannel = channelIdx === 2 ? 2 : channelIdx === 1 ? 1 : undefined;
     setActionLoadingId(loadId);
     try {
-      await AdminApi.stopLiveStream(court.cameraId, actualChannel);
+      await AdminApi.stopLiveStream(court.cameraId, actualChannel, logicalChannel);
       setFleet((prev) =>
         prev.map((v) => ({
           ...v,

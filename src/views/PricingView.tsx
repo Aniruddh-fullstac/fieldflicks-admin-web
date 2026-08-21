@@ -11,9 +11,13 @@ import { AdminApi } from '../services/api';
 export const PricingView = () => {
   const [pricingConfig, setPricingConfig] = useState({
     cricket_hourly_rate: 240,
+    cricket_half_hourly_rate: 120,
     pickleball_hourly_rate: 1000,
+    pickleball_half_hourly_rate: 500,
     padel_hourly_rate: 1500,
+    padel_half_hourly_rate: 750,
     default_hourly_rate: 500,
+    default_half_hourly_rate: 250,
     highlight_base_price: 149,
     shorts_base_price: 49,
     gst_rate: 0.18,
@@ -91,7 +95,7 @@ export const PricingView = () => {
             Pricing & Monetization Configuration
           </h2>
           <p style={{ color: 'var(--text-muted)', fontSize: '0.875rem', marginTop: 4 }}>
-            Configure sport-wise hourly rates, highlights, and tax rules from the backend database.
+            Configure sport-wise half-hourly unlock rates, highlights, and tax rules from the backend database.
           </p>
         </div>
 
@@ -121,7 +125,7 @@ export const PricingView = () => {
               Pay-Per-Match & Content Pricing
             </h3>
             <p style={{ color: 'var(--text-muted)', fontSize: '0.8rem', marginTop: 2 }}>
-              Dynamic sport-based hourly rates and media add-on base prices
+              Sport-based half-hourly unlock rates (billed in 30-minute blocks) and media add-on base prices
             </p>
           </div>
           <span className="badge-neon green">Active In App</span>
@@ -129,10 +133,14 @@ export const PricingView = () => {
 
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 16 }}>
           {[
-            { id: 'cricket_hourly_rate', name: 'Cricket Match (Hourly)', desc: 'Base recording price per hour for Cricket' },
-            { id: 'pickleball_hourly_rate', name: 'Pickleball Match (Hourly)', desc: 'Base recording price per hour for Pickleball' },
-            { id: 'padel_hourly_rate', name: 'Padel Match (Hourly)', desc: 'Base recording price per hour for Padel' },
-            { id: 'default_hourly_rate', name: 'Default Match (Hourly)', desc: 'Base recording price per hour for unconfigured sports' },
+            { id: 'cricket_half_hourly_rate', name: 'Cricket Match (30 min)', desc: 'Unlock price per 30-minute block for Cricket' },
+            { id: 'pickleball_half_hourly_rate', name: 'Pickleball Match (30 min)', desc: 'Unlock price per 30-minute block for Pickleball' },
+            { id: 'padel_half_hourly_rate', name: 'Padel Match (30 min)', desc: 'Unlock price per 30-minute block for Padel' },
+            { id: 'default_half_hourly_rate', name: 'Default Match (30 min)', desc: 'Unlock price per 30-minute block for unconfigured sports' },
+            { id: 'cricket_hourly_rate', name: 'Cricket Match (Hourly ref)', desc: 'Reference hourly rate (not used for billing when half-hourly is set)' },
+            { id: 'pickleball_hourly_rate', name: 'Pickleball Match (Hourly ref)', desc: 'Reference hourly rate' },
+            { id: 'padel_hourly_rate', name: 'Padel Match (Hourly ref)', desc: 'Reference hourly rate' },
+            { id: 'default_hourly_rate', name: 'Default Match (Hourly ref)', desc: 'Reference hourly rate' },
             { id: 'highlight_base_price', name: 'AI Highlight Reel', desc: 'Flat fee to unlock the AI Highlight Reel' },
             { id: 'shorts_base_price', name: 'Premium Short Clip', desc: 'Flat fee to export a premium manual clip' },
           ].map((cp) => (

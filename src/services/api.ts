@@ -10,11 +10,20 @@ import type {
   DatabaseSnapshot,
 } from '../types';
 
-const defaultProdUrl = 'https://fieldfflix-backend.onrender.com';
+const defaultProdUrl = 'https://api.fieldflicks.com';
 const isDev = import.meta.env.DEV;
 let rawBaseUrl = import.meta.env.VITE_API_URL !== undefined && import.meta.env.VITE_API_URL !== ''
   ? String(import.meta.env.VITE_API_URL)
   : (isDev ? '' : defaultProdUrl);
+
+// Avoid mixed-content blocks when admin is served over HTTPS.
+if (
+  typeof window !== 'undefined' &&
+  window.location.protocol === 'https:' &&
+  rawBaseUrl.startsWith('http://')
+) {
+  rawBaseUrl = `https://${rawBaseUrl.slice('http://'.length)}`;
+}
 
 // Sanitize accidental copy-paste in Vercel env settings (e.g. trailing "vite_api_url=")
 rawBaseUrl = rawBaseUrl
@@ -330,11 +339,13 @@ export const AdminApi = {
     cameraId: string,
     courtName: string,
     channel?: number,
+    logicalChannel?: 1 | 2,
   ): Promise<any> {
     const res = await api.post('/recording/start-live-stream', {
       cameraId,
       streamTitle: `Live Stream: ${courtName}`,
       ...(channel != null ? { channel } : {}),
+      ...(logicalChannel != null ? { logicalChannel } : {}),
     });
     return extractData<any>(res);
   },
@@ -353,10 +364,15 @@ export const AdminApi = {
     return { channels: results };
   },
 
-  async stopLiveStream(cameraId: string, channel?: number): Promise<any> {
+  async stopLiveStream(
+    cameraId: string,
+    channel?: number,
+    logicalChannel?: 1 | 2,
+  ): Promise<any> {
     const res = await api.post('/recording/stop-live-stream', {
       cameraId,
       ...(channel != null ? { channel } : {}),
+      ...(logicalChannel != null ? { logicalChannel } : {}),
     });
     return extractData<any>(res);
   },
