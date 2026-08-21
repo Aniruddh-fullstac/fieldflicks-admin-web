@@ -9,6 +9,7 @@ import {
   ShieldCheck,
   Wifi,
   Sparkles,
+  EyeOff,
 } from 'lucide-react';
 import { AdminApi } from '../services/api';
 import type { CourtCamera } from '../types';
@@ -34,6 +35,7 @@ export const ConfigureCourtModal: React.FC<ConfigureCourtModalProps> = ({
   const [courtNumber, setCourtNumber] = useState<number>(court?.courtNumber ?? 1);
   const [piUrl, setPiUrl] = useState(court?.raspberryPiBaseUrl || '');
   const [piApiKey, setPiApiKey] = useState(court?.raspberryPiApiKey || '');
+  const [hiddenFromApp, setHiddenFromApp] = useState(court?.hiddenFromApp ?? false);
 
   const [isSaving, setIsSaving] = useState(false);
   const [isTesting, setIsTesting] = useState(false);
@@ -86,6 +88,7 @@ export const ConfigureCourtModal: React.FC<ConfigureCourtModalProps> = ({
           court_number: courtNumber,
           raspberryPiBaseUrl: piUrl.trim() || undefined,
           raspberryPiApiKey: piApiKey.trim() || undefined,
+          hidden_from_app: hiddenFromApp,
         });
       } else {
         await AdminApi.createCameraMapping({
@@ -217,6 +220,75 @@ export const ConfigureCourtModal: React.FC<ConfigureCourtModalProps> = ({
             >
               <AlertCircle size={16} style={{ flexShrink: 0 }} />
               <span>{errorMessage}</span>
+            </div>
+          )}
+
+          {/* Athlete app visibility */}
+          {isEditing && (
+            <div
+              style={{
+                padding: '14px 16px',
+                borderRadius: 10,
+                border: '1px solid var(--border-subtle)',
+                backgroundColor: hiddenFromApp
+                  ? 'rgba(255, 171, 0, 0.08)'
+                  : 'rgba(255, 255, 255, 0.03)',
+                display: 'flex',
+                alignItems: 'flex-start',
+                justifyContent: 'space-between',
+                gap: 16,
+              }}
+            >
+              <div style={{ flex: 1 }}>
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 8,
+                    fontWeight: 700,
+                    color: '#FFFFFF',
+                    fontSize: '0.85rem',
+                    marginBottom: 6,
+                  }}
+                >
+                  <EyeOff size={16} color={hiddenFromApp ? '#FFB300' : 'var(--text-muted)'} />
+                  Hide from athlete app
+                </div>
+                <p style={{ margin: 0, fontSize: '0.75rem', color: 'var(--text-dim)', lineHeight: 1.5 }}>
+                  Hidden courts stay in the database but are removed from Find My Recording, court
+                  pickers, and QR scan. Use this for courts still being set up.
+                </p>
+              </div>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={hiddenFromApp}
+                onClick={() => setHiddenFromApp((v) => !v)}
+                style={{
+                  flexShrink: 0,
+                  width: 46,
+                  height: 26,
+                  borderRadius: 999,
+                  border: 'none',
+                  cursor: 'pointer',
+                  backgroundColor: hiddenFromApp ? '#FFB300' : 'rgba(255,255,255,0.15)',
+                  position: 'relative',
+                  transition: 'background-color 0.2s ease',
+                }}
+              >
+                <span
+                  style={{
+                    position: 'absolute',
+                    top: 3,
+                    left: hiddenFromApp ? 23 : 3,
+                    width: 20,
+                    height: 20,
+                    borderRadius: '50%',
+                    backgroundColor: '#FFFFFF',
+                    transition: 'left 0.2s ease',
+                  }}
+                />
+              </button>
             </div>
           )}
 

@@ -154,6 +154,7 @@ export interface CourtCamera {
   name: string;
   raspberryPiBaseUrl?: string;
   raspberryPiApiKey?: string;
+  hiddenFromApp?: boolean;
   isConfigured?: boolean;
   status: 'ONLINE' | 'OFFLINE' | 'RECORDING' | 'STREAMING' | 'UNCONFIGURED';
   isLiveStreaming?: boolean;

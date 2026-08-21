@@ -460,8 +460,28 @@ export const LiveFleetView = () => {
                       <div>
                         {/* Court Name and Status Badge */}
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                          <span style={{ fontWeight: 700, color: '#FFFFFF', fontSize: '0.95rem' }}>
+                          <span style={{ fontWeight: 700, color: '#FFFFFF', fontSize: '0.95rem', display: 'flex', alignItems: 'center', gap: 8 }}>
                             {court.name}
+                            {court.hiddenFromApp && (
+                              <span
+                                style={{
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: 4,
+                                  fontSize: '0.6rem',
+                                  fontWeight: 800,
+                                  padding: '2px 7px',
+                                  borderRadius: 100,
+                                  backgroundColor: 'rgba(255, 171, 0, 0.15)',
+                                  color: '#FFB300',
+                                  border: '1px solid rgba(255, 171, 0, 0.35)',
+                                  textTransform: 'uppercase',
+                                  letterSpacing: '0.04em',
+                                }}
+                              >
+                                Hidden
+                              </span>
+                            )}
                           </span>
                           {isLive ? (
                             <span className="badge-neon green" style={{ gap: 5, fontSize: '0.65rem', fontWeight: 800 }}>
