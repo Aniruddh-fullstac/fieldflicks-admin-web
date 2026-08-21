@@ -224,7 +224,7 @@ export const LiveFleetView = () => {
     const logicalChannel = channelIdx === 2 ? 2 : channelIdx === 1 ? 1 : undefined;
     setActionLoadingId(loadId);
     try {
-      await AdminApi.stopLiveStream(court.cameraId, actualChannel, logicalChannel);
+      const res = await AdminApi.stopLiveStream(court.cameraId, actualChannel, logicalChannel);
       setFleet((prev) =>
         prev.map((v) => ({
           ...v,
@@ -247,6 +247,9 @@ export const LiveFleetView = () => {
         });
       }
       setActionLoadingId(null);
+      if (res?.warning) {
+        alert(String(res.warning));
+      }
     } catch (err: any) {
       setActionLoadingId(null);
       const diag = parseDiagnosticError(err, {
