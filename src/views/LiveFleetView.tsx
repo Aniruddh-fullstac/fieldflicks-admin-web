@@ -16,6 +16,7 @@ import {
   Film,
   Database,
   Sparkles,
+  Link,
 } from 'lucide-react';
 import { AdminApi } from '../services/api';
 import { SkeletonCardList } from '../components/Skeleton';
@@ -95,6 +96,12 @@ export const LiveFleetView = () => {
   }, []);
 
 
+
+  const handleCopyPublicLink = (playbackId: string) => {
+    const url = `${window.location.origin}/?public_stream=${playbackId}`;
+    navigator.clipboard.writeText(url);
+    alert('Public stream link copied to clipboard!');
+  };
 
   const handleStartStream = async (court: CourtCamera, venue: VenueFleet, channelIdx?: number) => {
     // STREAMING GUARD: Immediately notify if court isn't configured
@@ -575,6 +582,30 @@ export const LiveFleetView = () => {
                               >
                                 <Square size={13} fill="currentColor" />
                               </button>
+                              
+                              {court.livePlaybackUrl && (
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    const match = court.livePlaybackUrl?.match(/stream\.mux\.com\/([^.]+)\.m3u8/);
+                                    if (match && match[1]) {
+                                      handleCopyPublicLink(match[1]);
+                                    }
+                                  }}
+                                  className="btn-secondary"
+                                  title="Copy Public Stream Link"
+                                  style={{
+                                    padding: '10px 10px',
+                                    color: 'var(--text-muted)',
+                                    borderColor: 'rgba(255, 255, 255, 0.1)',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                  }}
+                                >
+                                  <Link size={13} />
+                                </button>
+                              )}
                             </div>
 
                             {/* Channel 2 Row */}
@@ -649,6 +680,30 @@ export const LiveFleetView = () => {
                                 >
                                   <Square size={13} fill="currentColor" />
                                 </button>
+                                
+                                {court.livePlaybackUrlCh2 && (
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      const match = court.livePlaybackUrlCh2?.match(/stream\.mux\.com\/([^.]+)\.m3u8/);
+                                      if (match && match[1]) {
+                                        handleCopyPublicLink(match[1]);
+                                      }
+                                    }}
+                                    className="btn-secondary"
+                                    title="Copy Public Stream Link (Ch 2)"
+                                    style={{
+                                      padding: '10px 10px',
+                                      color: 'var(--text-muted)',
+                                      borderColor: 'rgba(255, 255, 255, 0.1)',
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      justifyContent: 'center',
+                                    }}
+                                  >
+                                    <Link size={13} />
+                                  </button>
+                                )}
                               </div>
                             )}
 

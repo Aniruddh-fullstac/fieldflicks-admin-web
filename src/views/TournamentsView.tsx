@@ -14,6 +14,7 @@ import {
   Video,
   Image as ImageIcon,
   Loader2,
+  Link,
 } from 'lucide-react';
 import { AdminApi } from '../services/api';
 import { SkeletonCardList } from '../components/Skeleton';
@@ -94,6 +95,12 @@ export const TournamentsView = () => {
     const updated = await AdminApi.updateTournamentLiveStreams(tournament.id, liveStreams);
     setTournaments((prev) => prev.map((t) => (t.id === tournament.id ? { ...t, ...updated, liveStreams } : t)));
     return updated;
+  };
+
+  const handleCopyPublicLink = (playbackId: string) => {
+    const url = `${window.location.origin}/?public_stream=${playbackId}`;
+    navigator.clipboard.writeText(url);
+    alert('Public stream link copied to clipboard!');
   };
 
   const handleStartStream = async (tournament: Tournament, cameraId: string) => {
@@ -570,6 +577,24 @@ export const TournamentsView = () => {
                                   >
                                     <Square size={12} /> Stop
                                   </button>
+                                  {stream?.playbackUrl && (
+                                    <button
+                                      type="button"
+                                      disabled={busy}
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        const match = stream.playbackUrl?.match(/stream\.mux\.com\/([^.]+)\.m3u8/);
+                                        if (match && match[1]) {
+                                          handleCopyPublicLink(match[1]);
+                                        }
+                                      }}
+                                      className="btn-secondary"
+                                      title="Copy Public Stream Link"
+                                      style={{ padding: '6px 10px', fontSize: '0.7rem', color: 'var(--text-muted)' }}
+                                    >
+                                      <Link size={12} /> Link
+                                    </button>
+                                  )}
                                 </>
                               )}
                             </div>

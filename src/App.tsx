@@ -34,16 +34,34 @@ export function App() {
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const [watchStreamId, setWatchStreamId] = useState<string | null>(null);
   const [watchStreamTitle, setWatchStreamTitle] = useState<string>('');
+  const [publicStreamId, setPublicStreamId] = useState<string | null>(null);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const stream = params.get('stream');
     const title = params.get('title');
-    if (stream) {
+    const publicStream = params.get('public_stream');
+    
+    if (publicStream) {
+      setPublicStreamId(publicStream);
+    } else if (stream) {
       setWatchStreamId(stream);
       if (title) setWatchStreamTitle(title);
     }
   }, []);
+
+  if (publicStreamId) {
+    return (
+      <WatchStreamView
+        playbackId={publicStreamId}
+        streamTitle="FieldFlicks Live Broadcast"
+        onBack={() => {
+          // Send public users to the main marketing site when they exit
+          window.location.href = 'https://fieldflicks.in';
+        }}
+      />
+    );
+  }
 
   if (!isAuthenticated) {
     return <LoginView onLoginSuccess={() => setIsAuthenticated(true)} />;
