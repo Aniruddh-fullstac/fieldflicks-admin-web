@@ -1,47 +1,37 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 
+const API_TARGET = 'https://api.fieldflicks.com';
+
+/** Backend route prefixes used by the admin panel (local dev proxy → AWS API). */
+const API_PROXY_PREFIXES = [
+  '/admin',
+  '/auth',
+  '/tournaments',
+  '/coupons',
+  '/recording',
+  '/points',
+  '/flick-shorts',
+  '/turfs',
+  '/cameras',
+  '/file-service',
+  '/pricing',
+] as const;
+
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [react()],
   server: {
     port: 5173,
-    proxy: {
-      '/admin': {
-        target: 'https://fieldfflix-backend.onrender.com',
-        changeOrigin: true,
-        secure: false,
-      },
-      '/tournaments': {
-        target: 'https://fieldfflix-backend.onrender.com',
-        changeOrigin: true,
-        secure: false,
-      },
-      '/coupons': {
-        target: 'https://fieldfflix-backend.onrender.com',
-        changeOrigin: true,
-        secure: false,
-      },
-      '/recording': {
-        target: 'https://fieldfflix-backend.onrender.com',
-        changeOrigin: true,
-        secure: false,
-      },
-      '/points': {
-        target: 'https://fieldfflix-backend.onrender.com',
-        changeOrigin: true,
-        secure: false,
-      },
-      '/flick-shorts': {
-        target: 'https://fieldfflix-backend.onrender.com',
-        changeOrigin: true,
-        secure: false,
-      },
-      '/auth': {
-        target: 'https://fieldfflix-backend.onrender.com',
-        changeOrigin: true,
-        secure: false,
-      },
-    },
+    proxy: Object.fromEntries(
+      API_PROXY_PREFIXES.map((prefix) => [
+        prefix,
+        {
+          target: API_TARGET,
+          changeOrigin: true,
+          secure: true,
+        },
+      ]),
+    ),
   },
 });

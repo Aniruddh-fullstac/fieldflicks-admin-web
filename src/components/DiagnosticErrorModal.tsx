@@ -83,7 +83,7 @@ export const parseDiagnosticError = (
       message:
         'The Render backend server is currently rebuilding or restarting with the latest updates. Network requests are temporarily unavailable.',
       courtName: context?.courtName,
-      deviceUrl: 'https://fieldfflix-backend.onrender.com',
+      deviceUrl: 'https://api.fieldflicks.com',
       troubleshootingSteps: [
         'Render takes ~30-45 seconds to spin up the container after a Git push.',
         'Wait 10-15 seconds and click "Retry Connection" below.',
