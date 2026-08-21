@@ -29,6 +29,7 @@ if (!rawBaseUrl && !isDev) {
 }
 
 const API_BASE_URL = rawBaseUrl;
+console.log('🔗 FieldFlicks Admin Web Linked to DB URL (via API):', API_BASE_URL || 'Local Proxy (Vite)');
 
 const api = axios.create({
   baseURL: API_BASE_URL || undefined,
