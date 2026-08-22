@@ -357,3 +357,23 @@ export interface AdminHighlightMuxCycleResult {
   processed: number;
   summary: Record<string, number>;
 }
+
+export interface AdminMuxCycleProgress {
+  running: boolean;
+  status: 'idle' | 'running' | 'complete' | 'failed';
+  phase: 'video' | 'highlights' | null;
+  date: string | null;
+  startedAt: string | null;
+  completedAt: string | null;
+  totalCandidates: number;
+  processed: number;
+  summary: Record<string, number>;
+  results: Array<{
+    recordingId: string;
+    ok: boolean;
+    action: string;
+    error?: string;
+  }>;
+  highlightPhase?: AdminHighlightMuxCycleResult | null;
+  error?: string | null;
+}

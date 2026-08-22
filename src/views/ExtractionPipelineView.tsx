@@ -15,6 +15,7 @@ import {
 import { AdminApi } from '../services/api';
 import type {
   AdminExtractionRequestItem,
+  AdminMuxCycleProgress,
   AdminPipelineStorageAudit,
 } from '../types';
 
@@ -85,6 +86,7 @@ export const ExtractionPipelineView = () => {
   const [reattachingId, setReattachingId] = useState<string | null>(null);
   const [muxCycleRunning, setMuxCycleRunning] = useState(false);
   const [highlightCycleRunning, setHighlightCycleRunning] = useState(false);
+  const [muxCycleProgress, setMuxCycleProgress] = useState<AdminMuxCycleProgress | null>(null);
   const [toastMsg, setToastMsg] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -128,6 +130,47 @@ export const ExtractionPipelineView = () => {
     fetchAll();
   }, [fetchAll]);
 
+  const refreshMuxCycleStatus = useCallback(async () => {
+    try {
+      const status = await AdminApi.getMuxCycleStatus();
+      setMuxCycleProgress(status);
+      return status;
+    } catch {
+      return null;
+    }
+  }, []);
+
+  useEffect(() => {
+    refreshMuxCycleStatus();
+  }, [refreshMuxCycleStatus]);
+
+  useEffect(() => {
+    if (!muxCycleRunning && !highlightCycleRunning && !muxCycleProgress?.running) {
+      return;
+    }
+    const timer = window.setInterval(() => {
+      refreshMuxCycleStatus();
+    }, 2000);
+    return () => window.clearInterval(timer);
+  }, [
+    muxCycleRunning,
+    highlightCycleRunning,
+    muxCycleProgress?.running,
+    refreshMuxCycleStatus,
+  ]);
+
+  const pollWhileCycleRuns = async <T,>(task: Promise<T>): Promise<T> => {
+    const timer = window.setInterval(() => {
+      refreshMuxCycleStatus();
+    }, 2000);
+    try {
+      return await task;
+    } finally {
+      window.clearInterval(timer);
+      await refreshMuxCycleStatus();
+    }
+  };
+
   const handleReattachHighlights = async (recordingId: string) => {
     setReattachingId(recordingId);
     try {
@@ -144,7 +187,9 @@ export const ExtractionPipelineView = () => {
   const handleStartMuxCycle = async () => {
     setMuxCycleRunning(true);
     try {
-      const result = await AdminApi.runMuxIngestionCycle(selectedDate);
+      const result = await pollWhileCycleRuns(
+        AdminApi.runMuxIngestionCycle(selectedDate),
+      );
       const started = result.summary.mux_upload_started ?? 0;
       const polled = result.summary.polled_mux_asset ?? 0;
       const skipped =
@@ -154,13 +199,18 @@ export const ExtractionPipelineView = () => {
       const hl = result.highlightPhase;
       const hlEnqueued = hl?.summary.highlight_clips_enqueued ?? 0;
       const hlReady = hl?.summary.highlights_ready ?? 0;
-      const hlProcessing = hl?.summary.highlights_processing ?? 0;
       showToast(
-        `Mux cycle ${selectedDate}: ${started} video upload(s), ${polled} polled, ${skipped} skipped, ${failed} failed. Highlights: ${hlEnqueued} enqueued, ${hlReady} ready, ${hlProcessing} processing.`,
+        `Mux cycle done: ${started} video uploads, ${polled} polled, ${skipped} skipped, ${failed} failed. Highlights: ${hlEnqueued} enqueued, ${hlReady} ready.`,
       );
       await fetchAll(true);
     } catch (err: any) {
-      showToast(err?.message || 'Mux ingestion cycle failed');
+      const msg = String(err?.message || '');
+      if (msg.toLowerCase().includes('already running')) {
+        showToast('Mux cycle already running on the server — progress is shown below.');
+      } else {
+        showToast(msg || 'Mux ingestion cycle failed');
+      }
+      await refreshMuxCycleStatus();
     } finally {
       setMuxCycleRunning(false);
     }
@@ -169,7 +219,9 @@ export const ExtractionPipelineView = () => {
   const handleStartHighlightMuxCycle = async () => {
     setHighlightCycleRunning(true);
     try {
-      const result = await AdminApi.runHighlightMuxCycle(selectedDate);
+      const result = await pollWhileCycleRuns(
+        AdminApi.runHighlightMuxCycle(selectedDate),
+      );
       const enqueued = result.summary.highlight_clips_enqueued ?? 0;
       const ready = result.summary.highlights_ready ?? 0;
       const processing = result.summary.highlights_processing ?? 0;
@@ -179,11 +231,31 @@ export const ExtractionPipelineView = () => {
       );
       await fetchAll(true);
     } catch (err: any) {
-      showToast(err?.message || 'Highlight Mux cycle failed');
+      const msg = String(err?.message || '');
+      if (msg.toLowerCase().includes('already running')) {
+        showToast('A Mux cycle is already running — see progress below.');
+      } else {
+        showToast(msg || 'Highlight Mux cycle failed');
+      }
+      await refreshMuxCycleStatus();
     } finally {
       setHighlightCycleRunning(false);
     }
   };
+
+  const cycleProgressVisible =
+    muxCycleProgress &&
+    (muxCycleProgress.running ||
+      muxCycleProgress.status !== 'idle' ||
+      muxCycleRunning ||
+      highlightCycleRunning);
+
+  const videoProgressPct =
+    muxCycleProgress && muxCycleProgress.totalCandidates > 0
+      ? Math.round((muxCycleProgress.processed / muxCycleProgress.totalCandidates) * 100)
+      : muxCycleProgress?.status === 'complete'
+        ? 100
+        : 0;
 
   const pendingMuxForDay = useMemo(
     () =>
@@ -317,6 +389,162 @@ export const ExtractionPipelineView = () => {
           </button>
         </div>
       </div>
+
+      {cycleProgressVisible && muxCycleProgress ? (
+        <div className="glass-card" style={{ padding: 20 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
+            {(muxCycleProgress.running || muxCycleRunning || highlightCycleRunning) ? (
+              <Loader2 size={18} className="spin" color="var(--primary-neon)" />
+            ) : (
+              <CheckCircle2
+                size={18}
+                color={muxCycleProgress.status === 'failed' ? '#FF3D57' : '#00E676'}
+              />
+            )}
+            <h4 style={{ fontSize: 16, fontWeight: 700, margin: 0 }}>
+              Mux cycle progress
+              {muxCycleProgress.date ? ` · ${muxCycleProgress.date}` : ''}
+            </h4>
+            <span
+              style={{
+                marginLeft: 'auto',
+                fontSize: 12,
+                fontWeight: 700,
+                textTransform: 'uppercase',
+                color:
+                  muxCycleProgress.status === 'running'
+                    ? '#FFD600'
+                    : muxCycleProgress.status === 'failed'
+                      ? '#FF3D57'
+                      : '#00E676',
+              }}
+            >
+              {muxCycleProgress.running ? 'running' : muxCycleProgress.status}
+            </span>
+          </div>
+
+          <div style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 12 }}>
+            Phase:{' '}
+            <strong style={{ color: 'var(--text-main)' }}>
+              {muxCycleProgress.phase === 'highlights'
+                ? 'Highlight Mux clips (cut from ready videos)'
+                : muxCycleProgress.phase === 'video'
+                  ? 'Full-video Mux ingest (S3 → Mux)'
+                  : '—'}
+            </strong>
+            {muxCycleProgress.startedAt ? (
+              <span>
+                {' '}
+                · started{' '}
+                {formatIstDateTime(muxCycleProgress.startedAt)}
+              </span>
+            ) : null}
+            {muxCycleProgress.completedAt ? (
+              <span>
+                {' '}
+                · finished {formatIstDateTime(muxCycleProgress.completedAt)}
+              </span>
+            ) : null}
+          </div>
+
+          {muxCycleProgress.phase === 'video' && muxCycleProgress.totalCandidates > 0 ? (
+            <div style={{ marginBottom: 14 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, marginBottom: 6 }}>
+                <span style={{ color: 'var(--text-muted)' }}>Video ingest</span>
+                <span style={{ color: 'var(--text-main)', fontWeight: 700 }}>
+                  {muxCycleProgress.processed}/{muxCycleProgress.totalCandidates} ({videoProgressPct}%)
+                </span>
+              </div>
+              <div
+                style={{
+                  height: 8,
+                  borderRadius: 999,
+                  background: 'rgba(255,255,255,0.08)',
+                  overflow: 'hidden',
+                }}
+              >
+                <div
+                  style={{
+                    height: '100%',
+                    width: `${videoProgressPct}%`,
+                    background: 'linear-gradient(90deg,#22c55e,#16a34a)',
+                    transition: 'width 0.4s ease',
+                  }}
+                />
+              </div>
+            </div>
+          ) : null}
+
+          {Object.keys(muxCycleProgress.summary).length > 0 ? (
+            <div
+              style={{
+                display: 'flex',
+                flexWrap: 'wrap',
+                gap: 8,
+                marginBottom: muxCycleProgress.results.length > 0 ? 14 : 0,
+              }}
+            >
+              {Object.entries(muxCycleProgress.summary).map(([key, count]) => (
+                <span
+                  key={key}
+                  style={{
+                    fontSize: 11,
+                    fontWeight: 700,
+                    padding: '4px 10px',
+                    borderRadius: 999,
+                    background: 'rgba(255,255,255,0.06)',
+                    color: 'var(--text-muted)',
+                  }}
+                >
+                  {key}: {count}
+                </span>
+              ))}
+            </div>
+          ) : null}
+
+          {muxCycleProgress.error ? (
+            <div style={{ color: '#FF3D57', fontSize: 13, marginBottom: 12 }}>
+              {muxCycleProgress.error}
+            </div>
+          ) : null}
+
+          {muxCycleProgress.results.length > 0 ? (
+            <div style={{ overflowX: 'auto', maxHeight: 220, overflowY: 'auto' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+                <thead>
+                  <tr style={{ color: 'var(--text-dim)' }}>
+                    <th style={{ textAlign: 'left', padding: '6px 8px' }}>Recording</th>
+                    <th style={{ textAlign: 'left', padding: '6px 8px' }}>Result</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {muxCycleProgress.results.map((row) => (
+                    <tr key={row.recordingId} style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+                      <td style={{ padding: '6px 8px', fontFamily: 'monospace' }}>
+                        {row.recordingId.slice(0, 8)}…
+                      </td>
+                      <td
+                        style={{
+                          padding: '6px 8px',
+                          color: row.ok ? '#00E676' : '#FF3D57',
+                        }}
+                      >
+                        {row.action}
+                        {row.error ? ` — ${row.error}` : ''}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : muxCycleProgress.running ? (
+            <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>
+              Processing… this can take several minutes when many videos upload to Mux in parallel.
+              Keep this page open — progress updates every 2s.
+            </div>
+          ) : null}
+        </div>
+      ) : null}
 
       {audit && (
         <div

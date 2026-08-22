@@ -489,6 +489,11 @@ export const AdminApi = {
     return extractData<any>(res);
   },
 
+  async getMuxCycleStatus(): Promise<import('../types').AdminMuxCycleProgress> {
+    const res = await api.get('/admin/extraction-pipeline/mux-cycle/status');
+    return extractData<any>(res);
+  },
+
   // 6. FlickShorts Moderation & Public Feed
   async getFlickShorts(sport?: string): Promise<any[]> {
     const res = await api.get('/flick-shorts/admin', { params: { sport } });
