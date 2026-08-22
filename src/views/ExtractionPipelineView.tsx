@@ -83,6 +83,7 @@ export const ExtractionPipelineView = () => {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [reattachingId, setReattachingId] = useState<string | null>(null);
+  const [muxCycleRunning, setMuxCycleRunning] = useState(false);
   const [highlightCycleRunning, setHighlightCycleRunning] = useState(false);
   const [toastMsg, setToastMsg] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
