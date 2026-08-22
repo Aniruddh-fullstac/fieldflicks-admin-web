@@ -21,10 +21,17 @@ import { SkeletonCardList } from '../components/Skeleton';
 import { CompactDateBadge } from '../components/CompactDateBadge';
 import { LiveStreamModal } from '../components/LiveStreamModal';
 import type { Tournament, VenueFleet, CourtCamera, TournamentLiveStream } from '../types';
+import { resolveBotanicalPosterCourt } from '../utils/botanicalCourt';
 
-export const getChannelForCourt = (venueName: string, courtNumber: number | undefined | null, isCh2: boolean): number => {
+export const getChannelForCourt = (
+  venueName: string,
+  courtNumber: number | undefined | null,
+  isCh2: boolean,
+  cameraId?: string | null,
+): number => {
   if (venueName.toLowerCase().includes('botanical')) {
-    switch (courtNumber) {
+    const posterCourt = resolveBotanicalPosterCourt(cameraId, courtNumber);
+    switch (posterCourt) {
       case 1: return isCh2 ? 7 : 6;
       case 2: return isCh2 ? 12 : 4;
       case 3: return isCh2 ? 9 : 8;
@@ -113,7 +120,7 @@ export const TournamentsView = () => {
       return;
     }
     const { court, venue } = match;
-    const channel = getChannelForCourt(venue.turfName, court.courtNumber, isCh2);
+    const channel = getChannelForCourt(venue.turfName, court.courtNumber, isCh2, court.cameraId);
 
     if (!court.raspberryPiBaseUrl?.trim()) {
       alert(`${court.name} is not configured with a Pi URL. Configure it in Camera Fleet first.`);
@@ -160,7 +167,7 @@ export const TournamentsView = () => {
     const match = findCourtInFleet(baseCameraId);
     let channel = isCh2 ? 2 : 1;
     if (match) {
-      channel = getChannelForCourt(match.venue.turfName, match.court.courtNumber, isCh2);
+      channel = getChannelForCourt(match.venue.turfName, match.court.courtNumber, isCh2, match.court.cameraId);
     }
 
     setStreamLoadingId(cameraId);

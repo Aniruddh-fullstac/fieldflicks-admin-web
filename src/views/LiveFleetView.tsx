@@ -166,7 +166,7 @@ export const LiveFleetView = () => {
     }
 
     const loadId = channelIdx ? `${court.cameraId}-ch${channelIdx}` : court.cameraId;
-    const actualChannel = getChannelForCourt(venue.turfName, court.courtNumber, channelIdx === 2);
+    const actualChannel = getChannelForCourt(venue.turfName, court.courtNumber, channelIdx === 2, court.cameraId);
     const logicalChannel = channelIdx === 2 ? 2 : channelIdx === 1 ? 1 : undefined;
     setActionLoadingId(loadId);
     try {
@@ -236,7 +236,7 @@ export const LiveFleetView = () => {
 
   const handleStopStream = async (court: CourtCamera, venueName: string, channelIdx?: number) => {
     const loadId = channelIdx ? `${court.cameraId}-ch${channelIdx}` : court.cameraId;
-    const actualChannel = getChannelForCourt(venueName, court.courtNumber, channelIdx === 2);
+    const actualChannel = getChannelForCourt(venueName, court.courtNumber, channelIdx === 2, court.cameraId);
     const logicalChannel = channelIdx === 2 ? 2 : channelIdx === 1 ? 1 : undefined;
     setActionLoadingId(loadId);
     try {
