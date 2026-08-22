@@ -75,12 +75,23 @@ export const ExtractionPipelineView = () => {
     else setLoading(true);
     setError(null);
     try {
-      const [reqRes, auditRes] = await Promise.all([
+      const [reqRes, auditRes] = await Promise.allSettled([
         AdminApi.getExtractionRequests({ date: selectedDate, limit: 200 }),
         AdminApi.getPipelineStorageAudit(),
       ]);
-      setRequests(reqRes.requests || []);
-      setAudit(auditRes);
+
+      if (reqRes.status === 'fulfilled') {
+        setRequests(reqRes.value.requests || []);
+      } else {
+        throw reqRes.reason;
+      }
+
+      if (auditRes.status === 'fulfilled') {
+        setAudit(auditRes.value);
+      } else {
+        console.warn('Pipeline storage audit failed:', auditRes.reason);
+        setAudit(null);
+      }
     } catch (err: any) {
       console.error(err);
       setError(err?.message || 'Failed to load extraction pipeline');
