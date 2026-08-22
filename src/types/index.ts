@@ -317,3 +317,16 @@ export interface AdminPipelineStorageAudit {
     updatedAt?: string;
   }>;
 }
+
+export interface AdminMuxIngestionCycleResult {
+  date: string;
+  totalCandidates: number;
+  processed: number;
+  summary: Record<string, number>;
+  results: Array<{
+    recordingId: string;
+    ok: boolean;
+    action: string;
+    error?: string;
+  }>;
+}

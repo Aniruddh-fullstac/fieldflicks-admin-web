@@ -10,9 +10,13 @@ import {
   CheckCircle2,
   Loader2,
   Database,
+  PlayCircle,
 } from 'lucide-react';
 import { AdminApi } from '../services/api';
-import type { AdminExtractionRequestItem, AdminPipelineStorageAudit } from '../types';
+import type {
+  AdminExtractionRequestItem,
+  AdminPipelineStorageAudit,
+} from '../types';
 
 function todayIstDateInput(): string {
   return new Intl.DateTimeFormat('en-CA', {
@@ -69,7 +73,7 @@ export const ExtractionPipelineView = () => {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [reattachingId, setReattachingId] = useState<string | null>(null);
-  const [retryingMuxId, setRetryingMuxId] = useState<string | null>(null);
+  const [muxCycleRunning, setMuxCycleRunning] = useState(false);
   const [toastMsg, setToastMsg] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -126,18 +130,31 @@ export const ExtractionPipelineView = () => {
     }
   };
 
-  const handleRetryMux = async (recordingId: string) => {
-    setRetryingMuxId(recordingId);
+  const handleStartMuxCycle = async () => {
+    setMuxCycleRunning(true);
     try {
-      const result = await AdminApi.retryMuxIngest(recordingId);
-      showToast(`Mux retry: ${result.action}`);
+      const result = await AdminApi.runMuxIngestionCycle(selectedDate);
+      const started = result.summary.mux_upload_started ?? 0;
+      const polled = result.summary.polled_mux_asset ?? 0;
+      const skipped =
+        (result.summary.already_ready ?? 0) +
+        (result.summary.no_source_video ?? 0);
+      const failed = result.summary.failed ?? 0;
+      showToast(
+        `Mux cycle ${selectedDate}: ${started} upload(s) started, ${polled} polled, ${skipped} skipped, ${failed} failed (${result.processed}/${result.totalCandidates})`,
+      );
       await fetchAll(true);
     } catch (err: any) {
-      showToast(err?.message || 'Failed to retry Mux ingest');
+      showToast(err?.message || 'Mux ingestion cycle failed');
     } finally {
-      setRetryingMuxId(null);
+      setMuxCycleRunning(false);
     }
   };
+
+  const pendingMuxForDay = useMemo(
+    () => requests.filter((row) => row.hasS3 && !row.hasMux).length,
+    [requests],
+  );
 
   const summary = useMemo(() => {
     const inFlight = requests.filter((r) =>
@@ -189,8 +206,8 @@ export const ExtractionPipelineView = () => {
           <p style={{ color: 'var(--text-muted)', fontSize: 14 }}>
             One row per match session (dual NVR channels grouped). Use{' '}
             <strong style={{ color: 'var(--primary-neon)' }}>Sync HL</strong> to pull S3 highlights
-            and <strong style={{ color: 'var(--primary-neon)' }}>Retry Mux</strong> when S3 exists
-            but playback is missing.
+            or <strong style={{ color: 'var(--primary-neon)' }}>Start Mux Cycle</strong> to ingest
+            all S3-ready videos for the selected day into Mux (one by one).
           </p>
         </div>
 
@@ -210,6 +227,21 @@ export const ExtractionPipelineView = () => {
               }}
             />
           </label>
+          <button
+            type="button"
+            className="btn-primary"
+            onClick={handleStartMuxCycle}
+            disabled={muxCycleRunning || refreshing}
+            style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}
+            title={
+              pendingMuxForDay > 0
+                ? `${pendingMuxForDay} session(s) with S3 but no Mux`
+                : 'Retry Mux ingest for all recordings on this date'
+            }
+          >
+            <PlayCircle size={16} className={muxCycleRunning ? 'spin' : undefined} />
+            {muxCycleRunning ? 'Mux cycle running…' : 'Start Mux Cycle'}
+          </button>
           <button
             type="button"
             className="btn-primary"
@@ -422,33 +454,15 @@ export const ExtractionPipelineView = () => {
                         )}
                       </td>
                       <td style={{ padding: '14px 16px', verticalAlign: 'top' }}>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                          <button
-                            type="button"
-                            className="btn-primary"
-                            disabled={reattachingId === primaryId}
-                            onClick={() => handleReattachHighlights(primaryId)}
-                            style={{ fontSize: 12, padding: '8px 12px', whiteSpace: 'nowrap' }}
-                          >
-                            {reattachingId === primaryId ? 'Syncing…' : 'Sync HL'}
-                          </button>
-                          {!row.hasMux && (
-                            <button
-                              type="button"
-                              className="btn-primary"
-                              disabled={retryingMuxId === primaryId}
-                              onClick={() => handleRetryMux(primaryId)}
-                              style={{
-                                fontSize: 12,
-                                padding: '8px 12px',
-                                whiteSpace: 'nowrap',
-                                opacity: 0.9,
-                              }}
-                            >
-                              {retryingMuxId === primaryId ? 'Retrying…' : 'Retry Mux'}
-                            </button>
-                          )}
-                        </div>
+                        <button
+                          type="button"
+                          className="btn-primary"
+                          disabled={reattachingId === primaryId}
+                          onClick={() => handleReattachHighlights(primaryId)}
+                          style={{ fontSize: 12, padding: '8px 12px', whiteSpace: 'nowrap' }}
+                        >
+                          {reattachingId === primaryId ? 'Syncing…' : 'Sync HL'}
+                        </button>
                       </td>
                     </tr>
                   );
@@ -486,15 +500,6 @@ export const ExtractionPipelineView = () => {
                 <div style={{ textAlign: 'right', color: 'var(--text-muted)' }}>
                   <div>{item.status}</div>
                   <div style={{ fontSize: 12 }}>{formatIstDateTime(item.updatedAt)}</div>
-                  <button
-                    type="button"
-                    className="btn-primary"
-                    disabled={retryingMuxId === item.id}
-                    onClick={() => handleRetryMux(item.id)}
-                    style={{ fontSize: 11, padding: '6px 10px', marginTop: 8 }}
-                  >
-                    {retryingMuxId === item.id ? '…' : 'Retry Mux'}
-                  </button>
                 </div>
               </div>
             ))}
