@@ -77,6 +77,33 @@ function highlightMuxLabel(row: AdminExtractionRequestItem): string {
   return `${hl.pending} pending clip`;
 }
 
+/** Hover text for Mux cycle summary / result action keys (admin pipeline). */
+const MUX_CYCLE_ACTION_HELP: Record<string, string> = {
+  no_source_video:
+    'Full match: no MP4 found in S3 for this recording — nothing to send to Mux yet.',
+  mux_upload_pending:
+    'Full match: file was sent to Mux but the direct upload is still waiting or processing.',
+  mux_upload_started: 'Full match: S3 MP4 upload to Mux was just started.',
+  mux_still_processing: 'Full match: Mux asset exists but encoding is not finished yet.',
+  polled_mux_asset: 'Full match: polled Mux — asset is ready and playback ID was saved.',
+  already_ready: 'Full match: already had Mux playback — skipped.',
+  failed: 'Full match: Mux ingest step failed for this recording.',
+  hl_no_highlights:
+    'Highlights: no button-press moments linked to this recording.',
+  hl_highlight_clips_enqueued:
+    'Highlights: clip jobs were queued on Mux (cut from the full-match asset).',
+  hl_highlights_ready:
+    'Highlights: all linked clips have Mux playback IDs and are ready in the app.',
+  hl_highlights_processing:
+    'Highlights: clips exist but Mux is still encoding at least one.',
+  hl_highlights_pending:
+    'Highlights: clips waiting for Mux clip creation to start.',
+};
+
+function muxActionLabel(key: string): string {
+  return MUX_CYCLE_ACTION_HELP[key] ?? key.replace(/_/g, ' ');
+}
+
 export const ExtractionPipelineView = () => {
   const [selectedDate, setSelectedDate] = useState(todayIstDateInput());
   const [requests, setRequests] = useState<AdminExtractionRequestItem[]>([]);
@@ -87,6 +114,7 @@ export const ExtractionPipelineView = () => {
   const [muxCycleRunning, setMuxCycleRunning] = useState(false);
   const [highlightCycleRunning, setHighlightCycleRunning] = useState(false);
   const [muxCycleProgress, setMuxCycleProgress] = useState<AdminMuxCycleProgress | null>(null);
+  const [muxStatusCheckedAt, setMuxStatusCheckedAt] = useState<Date | null>(null);
   const [toastMsg, setToastMsg] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -134,6 +162,7 @@ export const ExtractionPipelineView = () => {
     try {
       const status = await AdminApi.getMuxCycleStatus();
       setMuxCycleProgress(status);
+      setMuxStatusCheckedAt(new Date());
       return status;
     } catch {
       return null;
@@ -142,6 +171,10 @@ export const ExtractionPipelineView = () => {
 
   useEffect(() => {
     refreshMuxCycleStatus();
+    const timer = window.setInterval(() => {
+      refreshMuxCycleStatus();
+    }, 4000);
+    return () => window.clearInterval(timer);
   }, [refreshMuxCycleStatus]);
 
   useEffect(() => {
@@ -252,6 +285,69 @@ export const ExtractionPipelineView = () => {
       setHighlightCycleRunning(false);
     }
   };
+
+  const isMuxCycleActive =
+    Boolean(muxCycleProgress?.running) || muxCycleRunning || highlightCycleRunning;
+
+  const muxLiveBanner = useMemo(() => {
+    if (!muxCycleProgress) {
+      return {
+        label: 'UNKNOWN',
+        color: '#94A3B8',
+        bg: 'rgba(148,163,184,0.12)',
+        message: 'Could not load Mux cycle status from the server.',
+      };
+    }
+
+    if (isMuxCycleActive) {
+      const phaseLabel =
+        muxCycleProgress.phase === 'highlights'
+          ? 'Highlight clips'
+          : muxCycleProgress.phase === 'video'
+            ? 'Full-video ingest'
+            : 'Processing';
+      const progress =
+        muxCycleProgress.totalCandidates > 0
+          ? ` · ${muxCycleProgress.processed}/${muxCycleProgress.totalCandidates} recordings`
+          : '';
+      return {
+        label: 'RUNNING NOW',
+        color: '#FFD600',
+        bg: 'rgba(255,214,0,0.12)',
+        message: `${phaseLabel}${progress}. Updates every 2–4s — keep this tab open.`,
+      };
+    }
+
+    if (muxCycleProgress.status === 'complete') {
+      return {
+        label: 'FINISHED',
+        color: '#00E676',
+        bg: 'rgba(0,230,118,0.12)',
+        message: muxCycleProgress.completedAt
+          ? `Last cycle completed ${formatIstDateTime(muxCycleProgress.completedAt)}. Safe to start again for new uploads on the same date.`
+          : 'Last cycle completed. Safe to start again for new uploads on the same date.',
+      };
+    }
+
+    if (muxCycleProgress.status === 'failed') {
+      return {
+        label: 'FAILED',
+        color: '#FF3D57',
+        bg: 'rgba(255,61,87,0.12)',
+        message:
+          muxCycleProgress.error ||
+          'The last Mux cycle failed. Check results below or retry Start Mux Cycle.',
+      };
+    }
+
+    return {
+      label: 'IDLE',
+      color: '#94A3B8',
+      bg: 'rgba(148,163,184,0.10)',
+      message:
+        'No Mux backfill job is running on the server right now. Click Start Mux Cycle to process recordings for the selected date.',
+    };
+  }, [isMuxCycleActive, muxCycleProgress]);
 
   const cycleProgressVisible =
     muxCycleProgress &&
@@ -400,6 +496,59 @@ export const ExtractionPipelineView = () => {
         </div>
       </div>
 
+      <div
+        className="glass-card"
+        style={{
+          padding: '14px 18px',
+          display: 'flex',
+          flexWrap: 'wrap',
+          gap: 12,
+          alignItems: 'center',
+          borderColor: muxLiveBanner.color,
+          boxShadow: isMuxCycleActive ? `0 0 0 1px ${muxLiveBanner.color}33` : undefined,
+        }}
+      >
+        {isMuxCycleActive ? (
+          <Loader2 size={18} className="spin" color={muxLiveBanner.color} />
+        ) : muxCycleProgress?.status === 'complete' ? (
+          <CheckCircle2 size={18} color={muxLiveBanner.color} />
+        ) : muxCycleProgress?.status === 'failed' ? (
+          <AlertTriangle size={18} color={muxLiveBanner.color} />
+        ) : (
+          <Clock size={18} color={muxLiveBanner.color} />
+        )}
+        <div style={{ flex: 1, minWidth: 220 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
+            <span
+              style={{
+                fontSize: 11,
+                fontWeight: 800,
+                letterSpacing: 1,
+                padding: '3px 8px',
+                borderRadius: 999,
+                background: muxLiveBanner.bg,
+                color: muxLiveBanner.color,
+              }}
+            >
+              {muxLiveBanner.label}
+            </span>
+            {muxCycleProgress?.date ? (
+              <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>
+                cycle date {muxCycleProgress.date}
+              </span>
+            ) : null}
+          </div>
+          <div style={{ fontSize: 13, color: 'var(--text-main)', lineHeight: 1.45 }}>
+            {muxLiveBanner.message}
+          </div>
+        </div>
+        <div style={{ fontSize: 11, color: 'var(--text-dim)', textAlign: 'right' }}>
+          Status checked
+          <br />
+          {muxStatusCheckedAt ? formatIstDateTime(muxStatusCheckedAt.toISOString()) : '—'}
+        </div>
+      </div>
+
       {cycleProgressVisible && muxCycleProgress ? (
         <div className="glass-card" style={{ padding: 20 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
@@ -497,6 +646,7 @@ export const ExtractionPipelineView = () => {
               {Object.entries(muxCycleProgress.summary).map(([key, count]) => (
                 <span
                   key={key}
+                  title={muxActionLabel(key)}
                   style={{
                     fontSize: 11,
                     fontWeight: 700,
@@ -504,6 +654,7 @@ export const ExtractionPipelineView = () => {
                     borderRadius: 999,
                     background: 'rgba(255,255,255,0.06)',
                     color: 'var(--text-muted)',
+                    cursor: 'help',
                   }}
                 >
                   {key}: {count}
@@ -534,9 +685,11 @@ export const ExtractionPipelineView = () => {
                         {row.recordingId.slice(0, 8)}…
                       </td>
                       <td
+                        title={muxActionLabel(row.action)}
                         style={{
                           padding: '6px 8px',
                           color: row.ok ? '#00E676' : '#FF3D57',
+                          cursor: 'help',
                         }}
                       >
                         {row.action}
