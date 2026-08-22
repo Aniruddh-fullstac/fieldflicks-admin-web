@@ -69,6 +69,7 @@ export const ExtractionPipelineView = () => {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [reattachingId, setReattachingId] = useState<string | null>(null);
+  const [retryingMuxId, setRetryingMuxId] = useState<string | null>(null);
   const [toastMsg, setToastMsg] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -76,19 +77,6 @@ export const ExtractionPipelineView = () => {
     setToastMsg(msg);
     setTimeout(() => setToastMsg(null), 4000);
   };
-
-  /** Primary row per session (lowest NVR channel) — highlights attach here. */
-  const primaryRecordingBySession = useMemo(() => {
-    const map = new Map<string, AdminExtractionRequestItem>();
-    for (const row of requests) {
-      const sessionKey = row.extractSessionKey || row.id;
-      const existing = map.get(sessionKey);
-      if (!existing || row.nvrChannel < existing.nvrChannel) {
-        map.set(sessionKey, row);
-      }
-    }
-    return map;
-  }, [requests]);
 
   const fetchAll = useCallback(async (isRefresh = false) => {
     if (isRefresh) setRefreshing(true);
@@ -135,6 +123,19 @@ export const ExtractionPipelineView = () => {
       showToast(err?.message || 'Failed to reattach highlights');
     } finally {
       setReattachingId(null);
+    }
+  };
+
+  const handleRetryMux = async (recordingId: string) => {
+    setRetryingMuxId(recordingId);
+    try {
+      const result = await AdminApi.retryMuxIngest(recordingId);
+      showToast(`Mux retry: ${result.action}`);
+      await fetchAll(true);
+    } catch (err: any) {
+      showToast(err?.message || 'Failed to retry Mux ingest');
+    } finally {
+      setRetryingMuxId(null);
     }
   };
 
@@ -186,9 +187,10 @@ export const ExtractionPipelineView = () => {
             <h3 style={{ fontSize: 18, fontWeight: 700 }}>Extraction Pipeline Monitor</h3>
           </div>
           <p style={{ color: 'var(--text-muted)', fontSize: 14 }}>
-            Live DB status for every on-demand match request — court, slot, highlights, S3/Mux.
-            Use <strong style={{ color: 'var(--primary-neon)' }}>Sync HL</strong> in the Actions
-            column to pull S3 highlight clips into a recording.
+            One row per match session (dual NVR channels grouped). Use{' '}
+            <strong style={{ color: 'var(--primary-neon)' }}>Sync HL</strong> to pull S3 highlights
+            and <strong style={{ color: 'var(--primary-neon)' }}>Retry Mux</strong> when S3 exists
+            but playback is missing.
           </p>
         </div>
 
@@ -315,13 +317,16 @@ export const ExtractionPipelineView = () => {
               <tbody>
                 {requests.map((row) => {
                   const tone = statusTone(row.status);
-                  const sessionKey = row.extractSessionKey || row.id;
-                  const primaryRow = primaryRecordingBySession.get(sessionKey);
-                  const primaryId = primaryRow?.id ?? row.id;
-                  const isPrimary = primaryId === row.id;
+                  const nvrLabel =
+                    row.nvrChannelLabel ||
+                    (row.nvrChannels?.length
+                      ? `Ch ${row.nvrChannels.join(' + ')}`
+                      : `Ch ${row.nvrChannel}`);
+                  const primaryId = row.id;
+
                   return (
                     <tr
-                      key={row.id}
+                      key={row.extractSessionKey || row.id}
                       style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}
                     >
                       <td style={{ padding: '14px 16px', verticalAlign: 'top' }}>
@@ -353,11 +358,14 @@ export const ExtractionPipelineView = () => {
                             <div>{formatIstTime(row.startTime)} – {formatIstTime(row.endTime)}</div>
                             <div style={{ fontSize: 12, color: 'var(--text-dim)' }}>
                               {row.durationMinutes ?? '—'} min
+                              {(row.channelCount ?? 1) > 1
+                                ? ` · ${row.channelCount} angles`
+                                : ''}
                             </div>
                           </div>
                         </div>
                       </td>
-                      <td style={{ padding: '14px 16px', verticalAlign: 'top' }}>Ch {row.nvrChannel}</td>
+                      <td style={{ padding: '14px 16px', verticalAlign: 'top' }}>{nvrLabel}</td>
                       <td style={{ padding: '14px 16px', verticalAlign: 'top' }}>
                         <span
                           style={{
@@ -406,23 +414,41 @@ export const ExtractionPipelineView = () => {
                         {formatIstDateTime(row.updatedAt)}
                       </td>
                       <td style={{ padding: '14px 16px', verticalAlign: 'top', fontFamily: 'monospace', fontSize: 11, color: 'var(--text-dim)' }}>
-                        {row.id.slice(0, 8)}…
+                        {primaryId.slice(0, 8)}…
+                        {(row.recordingIds?.length ?? 0) > 1 && (
+                          <div style={{ marginTop: 4, fontSize: 10 }}>
+                            +{(row.recordingIds?.length ?? 1) - 1} channel
+                          </div>
+                        )}
                       </td>
                       <td style={{ padding: '14px 16px', verticalAlign: 'top' }}>
-                        <button
-                          type="button"
-                          className="btn-primary"
-                          disabled={reattachingId === primaryId}
-                          onClick={() => handleReattachHighlights(primaryId)}
-                          style={{ fontSize: 12, padding: '8px 12px', whiteSpace: 'nowrap' }}
-                          title={
-                            isPrimary
-                              ? 'Scan S3 and attach highlights for this session'
-                              : `Syncs primary recording ${primaryId.slice(0, 8)} (Ch ${primaryRow?.nvrChannel})`
-                          }
-                        >
-                          {reattachingId === primaryId ? 'Syncing…' : 'Sync HL'}
-                        </button>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                          <button
+                            type="button"
+                            className="btn-primary"
+                            disabled={reattachingId === primaryId}
+                            onClick={() => handleReattachHighlights(primaryId)}
+                            style={{ fontSize: 12, padding: '8px 12px', whiteSpace: 'nowrap' }}
+                          >
+                            {reattachingId === primaryId ? 'Syncing…' : 'Sync HL'}
+                          </button>
+                          {!row.hasMux && (
+                            <button
+                              type="button"
+                              className="btn-primary"
+                              disabled={retryingMuxId === primaryId}
+                              onClick={() => handleRetryMux(primaryId)}
+                              style={{
+                                fontSize: 12,
+                                padding: '8px 12px',
+                                whiteSpace: 'nowrap',
+                                opacity: 0.9,
+                              }}
+                            >
+                              {retryingMuxId === primaryId ? 'Retrying…' : 'Retry Mux'}
+                            </button>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   );
@@ -460,6 +486,15 @@ export const ExtractionPipelineView = () => {
                 <div style={{ textAlign: 'right', color: 'var(--text-muted)' }}>
                   <div>{item.status}</div>
                   <div style={{ fontSize: 12 }}>{formatIstDateTime(item.updatedAt)}</div>
+                  <button
+                    type="button"
+                    className="btn-primary"
+                    disabled={retryingMuxId === item.id}
+                    onClick={() => handleRetryMux(item.id)}
+                    style={{ fontSize: 11, padding: '6px 10px', marginTop: 8 }}
+                  >
+                    {retryingMuxId === item.id ? '…' : 'Retry Mux'}
+                  </button>
                 </div>
               </div>
             ))}

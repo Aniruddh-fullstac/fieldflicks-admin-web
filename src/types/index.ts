@@ -283,6 +283,10 @@ export interface AdminExtractionRequestItem {
   courtNumber: number;
   cameraId: string;
   nvrChannel: number;
+  nvrChannels?: number[];
+  nvrChannelLabel?: string;
+  channelCount?: number;
+  recordingIds?: string[];
   status: string;
   startTime: string;
   endTime?: string;

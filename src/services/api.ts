@@ -468,6 +468,13 @@ export const AdminApi = {
     return extractData<any>(res);
   },
 
+  async retryMuxIngest(
+    recordingId: string,
+  ): Promise<{ ok: boolean; action: string }> {
+    const res = await api.post(`/admin/recordings/${recordingId}/retry-mux-ingest`);
+    return extractData<any>(res);
+  },
+
   // 6. FlickShorts Moderation & Public Feed
   async getFlickShorts(sport?: string): Promise<any[]> {
     const res = await api.get('/flick-shorts/admin', { params: { sport } });
