@@ -69,7 +69,26 @@ export const ExtractionPipelineView = () => {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [reattachingId, setReattachingId] = useState<string | null>(null);
+  const [toastMsg, setToastMsg] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  const showToast = (msg: string) => {
+    setToastMsg(msg);
+    setTimeout(() => setToastMsg(null), 4000);
+  };
+
+  /** Primary row per session (lowest NVR channel) — highlights attach here. */
+  const primaryRecordingBySession = useMemo(() => {
+    const map = new Map<string, AdminExtractionRequestItem>();
+    for (const row of requests) {
+      const sessionKey = row.extractSessionKey || row.id;
+      const existing = map.get(sessionKey);
+      if (!existing || row.nvrChannel < existing.nvrChannel) {
+        map.set(sessionKey, row);
+      }
+    }
+    return map;
+  }, [requests]);
 
   const fetchAll = useCallback(async (isRefresh = false) => {
     if (isRefresh) setRefreshing(true);
@@ -136,6 +155,20 @@ export const ExtractionPipelineView = () => {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+      {toastMsg ? (
+        <div
+          className="glass-card"
+          style={{
+            padding: '12px 16px',
+            borderColor: 'var(--border-glow)',
+            color: 'var(--primary-neon)',
+            fontSize: 14,
+            fontWeight: 600,
+          }}
+        >
+          {toastMsg}
+        </div>
+      ) : null}
       <div
         className="glass-card"
         style={{
@@ -154,6 +187,8 @@ export const ExtractionPipelineView = () => {
           </div>
           <p style={{ color: 'var(--text-muted)', fontSize: 14 }}>
             Live DB status for every on-demand match request — court, slot, highlights, S3/Mux.
+            Use <strong style={{ color: 'var(--primary-neon)' }}>Sync HL</strong> in the Actions
+            column to pull S3 highlight clips into a recording.
           </p>
         </div>
 
@@ -280,6 +315,10 @@ export const ExtractionPipelineView = () => {
               <tbody>
                 {requests.map((row) => {
                   const tone = statusTone(row.status);
+                  const sessionKey = row.extractSessionKey || row.id;
+                  const primaryRow = primaryRecordingBySession.get(sessionKey);
+                  const primaryId = primaryRow?.id ?? row.id;
+                  const isPrimary = primaryId === row.id;
                   return (
                     <tr
                       key={row.id}
@@ -370,19 +409,20 @@ export const ExtractionPipelineView = () => {
                         {row.id.slice(0, 8)}…
                       </td>
                       <td style={{ padding: '14px 16px', verticalAlign: 'top' }}>
-                        {row.nvrChannel === 5 ? (
-                          <button
-                            type="button"
-                            className="btn-secondary"
-                            disabled={reattachingId === row.id}
-                            onClick={() => handleReattachHighlights(row.id)}
-                            style={{ fontSize: 12, padding: '6px 10px' }}
-                          >
-                            {reattachingId === row.id ? 'Syncing…' : 'Sync HL'}
-                          </button>
-                        ) : (
-                          <span style={{ fontSize: 11, color: 'var(--text-dim)' }}>—</span>
-                        )}
+                        <button
+                          type="button"
+                          className="btn-primary"
+                          disabled={reattachingId === primaryId}
+                          onClick={() => handleReattachHighlights(primaryId)}
+                          style={{ fontSize: 12, padding: '8px 12px', whiteSpace: 'nowrap' }}
+                          title={
+                            isPrimary
+                              ? 'Scan S3 and attach highlights for this session'
+                              : `Syncs primary recording ${primaryId.slice(0, 8)} (Ch ${primaryRow?.nvrChannel})`
+                          }
+                        >
+                          {reattachingId === primaryId ? 'Syncing…' : 'Sync HL'}
+                        </button>
                       </td>
                     </tr>
                   );
