@@ -190,6 +190,13 @@ export const ExtractionPipelineView = () => {
       const result = await pollWhileCycleRuns(
         AdminApi.runMuxIngestionCycle(selectedDate),
       );
+      if ((result as { alreadyRunning?: boolean }).alreadyRunning) {
+        showToast(
+          (result as { message?: string }).message ||
+            'Mux cycle already running — new videos for this date are added automatically.',
+        );
+        return;
+      }
       const started = result.summary.mux_upload_started ?? 0;
       const polled = result.summary.polled_mux_asset ?? 0;
       const stillProcessing =
@@ -362,8 +369,8 @@ export const ExtractionPipelineView = () => {
             style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}
             title={
               pendingMuxForDay > 0
-                ? `${pendingMuxForDay} session(s) with S3 but no Mux`
-                : 'Retry Mux ingest for all recordings on this date'
+                ? `Backfill: ${pendingMuxForDay} session(s) with video but no Mux. Safe to click while running — new uploads for this date are added without interrupting the current run.`
+                : 'Backfill Mux for all recordings on this IST date. New user requests encode individually via Pi callback, not through this button.'
             }
           >
             <PlayCircle size={16} className={muxCycleRunning ? 'spin' : undefined} />
