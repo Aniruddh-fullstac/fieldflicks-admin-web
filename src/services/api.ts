@@ -461,6 +461,13 @@ export const AdminApi = {
     return extractData<any>(res);
   },
 
+  async reattachRecordingHighlights(
+    recordingId: string,
+  ): Promise<{ recordingId: string; attached: number }> {
+    const res = await api.post(`/admin/recordings/${recordingId}/reattach-highlights`);
+    return extractData<any>(res);
+  },
+
   // 6. FlickShorts Moderation & Public Feed
   async getFlickShorts(sport?: string): Promise<any[]> {
     const res = await api.get('/flick-shorts/admin', { params: { sport } });

@@ -68,6 +68,7 @@ export const ExtractionPipelineView = () => {
   const [audit, setAudit] = useState<AdminPipelineStorageAudit | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [reattachingId, setReattachingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const fetchAll = useCallback(async (isRefresh = false) => {
@@ -104,6 +105,19 @@ export const ExtractionPipelineView = () => {
   useEffect(() => {
     fetchAll();
   }, [fetchAll]);
+
+  const handleReattachHighlights = async (recordingId: string) => {
+    setReattachingId(recordingId);
+    try {
+      const result = await AdminApi.reattachRecordingHighlights(recordingId);
+      showToast(`Attached ${result.attached} highlight(s) to ${recordingId.slice(0, 8)}`);
+      await fetchAll(true);
+    } catch (err: any) {
+      showToast(err?.message || 'Failed to reattach highlights');
+    } finally {
+      setReattachingId(null);
+    }
+  };
 
   const summary = useMemo(() => {
     const inFlight = requests.filter((r) =>
@@ -243,6 +257,7 @@ export const ExtractionPipelineView = () => {
                     'Pipeline',
                     'Updated',
                     'Recording ID',
+                    'Actions',
                   ].map((head) => (
                     <th
                       key={head}
@@ -353,6 +368,21 @@ export const ExtractionPipelineView = () => {
                       </td>
                       <td style={{ padding: '14px 16px', verticalAlign: 'top', fontFamily: 'monospace', fontSize: 11, color: 'var(--text-dim)' }}>
                         {row.id.slice(0, 8)}…
+                      </td>
+                      <td style={{ padding: '14px 16px', verticalAlign: 'top' }}>
+                        {row.nvrChannel === 5 ? (
+                          <button
+                            type="button"
+                            className="btn-secondary"
+                            disabled={reattachingId === row.id}
+                            onClick={() => handleReattachHighlights(row.id)}
+                            style={{ fontSize: 12, padding: '6px 10px' }}
+                          >
+                            {reattachingId === row.id ? 'Syncing…' : 'Sync HL'}
+                          </button>
+                        ) : (
+                          <span style={{ fontSize: 11, color: 'var(--text-dim)' }}>—</span>
+                        )}
                       </td>
                     </tr>
                   );
