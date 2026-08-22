@@ -192,6 +192,9 @@ export const ExtractionPipelineView = () => {
       );
       const started = result.summary.mux_upload_started ?? 0;
       const polled = result.summary.polled_mux_asset ?? 0;
+      const stillProcessing =
+        (result.summary.mux_still_processing ?? 0) +
+        (result.summary.mux_upload_pending ?? 0);
       const skipped =
         (result.summary.already_ready ?? 0) +
         (result.summary.no_source_video ?? 0);
@@ -200,7 +203,7 @@ export const ExtractionPipelineView = () => {
       const hlEnqueued = hl?.summary.highlight_clips_enqueued ?? 0;
       const hlReady = hl?.summary.highlights_ready ?? 0;
       showToast(
-        `Mux cycle done: ${started} video uploads, ${polled} polled, ${skipped} skipped, ${failed} failed. Highlights: ${hlEnqueued} enqueued, ${hlReady} ready.`,
+        `Mux cycle ${selectedDate}: ${result.processed}/${result.totalCandidates} processed — ${started} uploads, ${polled} polled, ${stillProcessing} processing, ${skipped} skipped, ${failed} failed. Highlights: ${hlEnqueued} enqueued, ${hlReady} ready.`,
       );
       await fetchAll(true);
     } catch (err: any) {
