@@ -311,6 +311,7 @@ export interface AdminExtractionRequestItem {
   updatedAt: string;
   extractAttempts: number;
   extractSessionKey?: string;
+  extractFailedReason?: string;
   highlightMux?: AdminHighlightMuxSummary;
   hasHighlightMux?: boolean;
   highlightMuxProcessing?: boolean;

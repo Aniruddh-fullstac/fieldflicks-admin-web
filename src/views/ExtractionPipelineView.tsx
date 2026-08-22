@@ -80,7 +80,13 @@ function highlightMuxLabel(row: AdminExtractionRequestItem): string {
 /** Hover text for Mux cycle summary / result action keys (admin pipeline). */
 const MUX_CYCLE_ACTION_HELP: Record<string, string> = {
   no_source_video:
-    'Full match: no MP4 found in S3 for this recording — nothing to send to Mux yet.',
+    'Full match: no MP4 in S3 yet (legacy bucket — see split tags below for Pi vs not started vs failed).',
+  no_source_video_pi_uploading:
+    'Full match: no S3 MP4 yet — Pi is extracting from the NVR and/or uploading (status extracting/uploading/in progress).',
+  no_source_video_not_started:
+    'Full match: no S3 MP4 yet — extraction was never dispatched (status requested/pending or no extract session).',
+  no_source_video_upload_failed:
+    'Full match: no S3 MP4 — Pi extraction or upload failed (status failed/cancelled or extract_failed_reason in metadata).',
   mux_upload_pending:
     'Full match: file was sent to Mux but the direct upload is still waiting or processing.',
   mux_upload_started: 'Full match: S3 MP4 upload to Mux was just started.',
@@ -102,6 +108,117 @@ const MUX_CYCLE_ACTION_HELP: Record<string, string> = {
 
 function muxActionLabel(key: string): string {
   return MUX_CYCLE_ACTION_HELP[key] ?? key.replace(/_/g, ' ');
+}
+
+const MUX_ACTION_SHORT_LABEL: Record<string, string> = {
+  no_source_video_pi_uploading: 'no S3 · Pi uploading',
+  no_source_video_not_started: 'no S3 · extract not started',
+  no_source_video_upload_failed: 'no S3 · Pi upload failed',
+};
+
+function muxActionShortLabel(key: string): string {
+  return MUX_ACTION_SHORT_LABEL[key] ?? key.replace(/_/g, ' ');
+}
+
+type NoSourceVideoHint = {
+  key: string;
+  shortLabel: string;
+  detail: string;
+  tone: 'warn' | 'fail' | 'muted';
+};
+
+function classifyNoSourceVideoFromRow(
+  row: AdminExtractionRequestItem,
+): NoSourceVideoHint | null {
+  if (row.hasS3) return null;
+
+  const status = String(row.status ?? '').toLowerCase();
+  const failedReason = String(row.extractFailedReason ?? '').trim();
+
+  if (
+    ['failed', 'cancelled', 'interrupted'].includes(status) ||
+    failedReason
+  ) {
+    return {
+      key: 'no_source_video_upload_failed',
+      shortLabel: 'Pi upload failed',
+      detail: failedReason
+        ? `Pi/extraction failed: ${failedReason}`
+        : 'Pi extraction or upload failed — no MP4 reached S3.',
+      tone: 'fail',
+    };
+  }
+
+  if (['extracting', 'uploading', 'in_progress'].includes(status)) {
+    return {
+      key: 'no_source_video_pi_uploading',
+      shortLabel: 'Pi still uploading',
+      detail:
+        'Pi is extracting from the NVR and/or uploading the MP4 — Mux will run once S3 has the file.',
+      tone: 'warn',
+    };
+  }
+
+  if (
+    ['uploaded', 'processing'].includes(status) &&
+    (row.extractSessionKey || row.extractAttempts > 0)
+  ) {
+    return {
+      key: 'no_source_video_pi_uploading',
+      shortLabel: 'Pi still uploading',
+      detail:
+        'Extraction was started but S3 does not have the MP4 yet — Pi may still be uploading or Mux direct upload is in flight.',
+      tone: 'warn',
+    };
+  }
+
+  if (['requested', 'pending'].includes(status) || !row.extractSessionKey) {
+    return {
+      key: 'no_source_video_not_started',
+      shortLabel: 'Extraction not started',
+      detail:
+        'No S3 MP4 — extraction has not been dispatched to the Pi for this session yet.',
+      tone: 'muted',
+    };
+  }
+
+  return {
+    key: 'no_source_video_pi_uploading',
+    shortLabel: 'Pi still uploading',
+    detail: 'Extract session exists but S3 has no MP4 yet — waiting on Pi.',
+    tone: 'warn',
+  };
+}
+
+function findExtractionRowForRecording(
+  requests: AdminExtractionRequestItem[],
+  recordingId: string,
+): AdminExtractionRequestItem | undefined {
+  return requests.find(
+    (row) => row.id === recordingId || row.recordingIds?.includes(recordingId),
+  );
+}
+
+function resolveMuxResultAction(
+  action: string,
+  recordingId: string,
+  requests: AdminExtractionRequestItem[],
+): string {
+  if (action.startsWith('no_source_video_')) return action;
+  if (action !== 'no_source_video') return action;
+
+  const row = findExtractionRowForRecording(requests, recordingId);
+  if (!row) return action;
+  return classifyNoSourceVideoFromRow(row)?.key ?? action;
+}
+
+function countNoSourceVideoSummary(summary: Record<string, number>): number {
+  return Object.entries(summary).reduce((sum, [key, count]) => {
+    if (key === 'no_source_video' || key.startsWith('no_source_video_')) {
+      return sum + count;
+    }
+    return sum;
+  }, 0);
 }
 
 export const ExtractionPipelineView = () => {
@@ -236,8 +353,7 @@ export const ExtractionPipelineView = () => {
         (result.summary.mux_still_processing ?? 0) +
         (result.summary.mux_upload_pending ?? 0);
       const skipped =
-        (result.summary.already_ready ?? 0) +
-        (result.summary.no_source_video ?? 0);
+        (result.summary.already_ready ?? 0) + countNoSourceVideoSummary(result.summary);
       const failed = result.summary.failed ?? 0;
       const hl = result.highlightPhase;
       const hlEnqueued = hl?.summary.highlight_clips_enqueued ?? 0;
@@ -652,12 +768,24 @@ export const ExtractionPipelineView = () => {
                     fontWeight: 700,
                     padding: '4px 10px',
                     borderRadius: 999,
-                    background: 'rgba(255,255,255,0.06)',
-                    color: 'var(--text-muted)',
+                    background: key.startsWith('no_source_video_upload_failed')
+                      ? 'rgba(255,61,87,0.12)'
+                      : key.startsWith('no_source_video_pi_uploading')
+                        ? 'rgba(255,214,0,0.12)'
+                        : key.startsWith('no_source_video_not_started')
+                          ? 'rgba(148,163,184,0.12)'
+                          : 'rgba(255,255,255,0.06)',
+                    color: key.startsWith('no_source_video_upload_failed')
+                      ? '#FF3D57'
+                      : key.startsWith('no_source_video_pi_uploading')
+                        ? '#FFD600'
+                        : key.startsWith('no_source_video_not_started')
+                          ? '#94A3B8'
+                          : 'var(--text-muted)',
                     cursor: 'help',
                   }}
                 >
-                  {key}: {count}
+                  {muxActionShortLabel(key)}: {count}
                 </span>
               ))}
             </div>
@@ -679,24 +807,37 @@ export const ExtractionPipelineView = () => {
                   </tr>
                 </thead>
                 <tbody>
-                  {muxCycleProgress.results.map((row) => (
+                  {muxCycleProgress.results.map((row) => {
+                    const resolvedAction = resolveMuxResultAction(
+                      row.action,
+                      row.recordingId,
+                      requests,
+                    );
+                    return (
                     <tr key={row.recordingId} style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }}>
                       <td style={{ padding: '6px 8px', fontFamily: 'monospace' }}>
                         {row.recordingId.slice(0, 8)}…
                       </td>
                       <td
-                        title={muxActionLabel(row.action)}
+                        title={muxActionLabel(resolvedAction)}
                         style={{
                           padding: '6px 8px',
-                          color: row.ok ? '#00E676' : '#FF3D57',
+                          color: resolvedAction.startsWith('no_source_video_upload_failed')
+                            ? '#FF3D57'
+                            : resolvedAction.startsWith('no_source_video_')
+                              ? '#FFD600'
+                              : row.ok
+                                ? '#00E676'
+                                : '#FF3D57',
                           cursor: 'help',
                         }}
                       >
-                        {row.action}
+                        {muxActionShortLabel(resolvedAction)}
                         {row.error ? ` — ${row.error}` : ''}
                       </td>
                     </tr>
-                  ))}
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
@@ -824,6 +965,7 @@ export const ExtractionPipelineView = () => {
               <tbody>
                 {requests.map((row) => {
                   const tone = statusTone(row.status);
+                  const noSourceHint = !row.hasS3 ? classifyNoSourceVideoFromRow(row) : null;
                   const nvrLabel =
                     row.nvrChannelLabel ||
                     (row.nvrChannels?.length
@@ -904,8 +1046,31 @@ export const ExtractionPipelineView = () => {
                       </td>
                       <td style={{ padding: '14px 16px', verticalAlign: 'top' }}>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: 12 }}>
-                          <span style={{ color: row.hasS3 ? '#00E676' : 'var(--text-dim)' }}>
+                          <span
+                            title={noSourceHint?.detail}
+                            style={{
+                              color: row.hasS3 ? '#00E676' : 'var(--text-dim)',
+                              cursor: noSourceHint ? 'help' : undefined,
+                            }}
+                          >
                             {row.hasS3 ? '✓ S3' : '○ S3'}
+                            {noSourceHint ? (
+                              <span
+                                style={{
+                                  marginLeft: 6,
+                                  fontSize: 10,
+                                  fontWeight: 700,
+                                  color:
+                                    noSourceHint.tone === 'fail'
+                                      ? '#FF3D57'
+                                      : noSourceHint.tone === 'warn'
+                                        ? '#FFD600'
+                                        : '#94A3B8',
+                                }}
+                              >
+                                · {noSourceHint.shortLabel}
+                              </span>
+                            ) : null}
                           </span>
                           <span
                             style={{
