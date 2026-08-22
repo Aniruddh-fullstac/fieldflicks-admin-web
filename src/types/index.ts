@@ -273,6 +273,16 @@ export interface AdminRecordingItem {
   createdAt: string;
 }
 
+export interface AdminHighlightMuxSummary {
+  total: number;
+  ready: number;
+  processing: number;
+  pending: number;
+  failed: number;
+  withoutAssetId: number;
+  status: 'none' | 'ready' | 'processing' | 'pending' | 'partial' | 'failed';
+}
+
 export interface AdminExtractionRequestItem {
   id: string;
   userId?: string;
@@ -301,6 +311,9 @@ export interface AdminExtractionRequestItem {
   updatedAt: string;
   extractAttempts: number;
   extractSessionKey?: string;
+  highlightMux?: AdminHighlightMuxSummary;
+  hasHighlightMux?: boolean;
+  highlightMuxProcessing?: boolean;
 }
 
 export interface AdminPipelineStorageAudit {
@@ -330,4 +343,17 @@ export interface AdminMuxIngestionCycleResult {
     action: string;
     error?: string;
   }>;
+  highlightPhase?: {
+    date: string;
+    totalCandidates: number;
+    processed: number;
+    summary: Record<string, number>;
+  };
+}
+
+export interface AdminHighlightMuxCycleResult {
+  date: string;
+  totalCandidates: number;
+  processed: number;
+  summary: Record<string, number>;
 }

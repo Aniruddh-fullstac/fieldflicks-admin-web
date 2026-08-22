@@ -482,6 +482,13 @@ export const AdminApi = {
     return extractData<any>(res);
   },
 
+  async runHighlightMuxCycle(
+    date: string,
+  ): Promise<import('../types').AdminHighlightMuxCycleResult> {
+    const res = await api.post('/admin/extraction-pipeline/highlight-mux-cycle', { date });
+    return extractData<any>(res);
+  },
+
   // 6. FlickShorts Moderation & Public Feed
   async getFlickShorts(sport?: string): Promise<any[]> {
     const res = await api.get('/flick-shorts/admin', { params: { sport } });

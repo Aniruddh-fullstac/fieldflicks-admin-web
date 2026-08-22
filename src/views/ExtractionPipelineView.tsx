@@ -66,6 +66,16 @@ function statusTone(status: string): { bg: string; color: string; label: string 
   return { bg: 'rgba(148,163,184,0.12)', color: '#94A3B8', label: status || 'unknown' };
 }
 
+function highlightMuxLabel(row: AdminExtractionRequestItem): string {
+  const hl = row.highlightMux;
+  if (!hl || hl.status === 'none') return 'No HL linked';
+  if (hl.status === 'ready') return `${hl.ready}/${hl.total} ready`;
+  if (hl.status === 'partial') return `${hl.ready}/${hl.total} ready · ${hl.withoutAssetId} need clip`;
+  if (hl.status === 'processing') return `${hl.processing} processing`;
+  if (hl.status === 'failed') return `${hl.failed} failed`;
+  return `${hl.pending} pending clip`;
+}
+
 export const ExtractionPipelineView = () => {
   const [selectedDate, setSelectedDate] = useState(todayIstDateInput());
   const [requests, setRequests] = useState<AdminExtractionRequestItem[]>([]);
@@ -73,7 +83,7 @@ export const ExtractionPipelineView = () => {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [reattachingId, setReattachingId] = useState<string | null>(null);
-  const [muxCycleRunning, setMuxCycleRunning] = useState(false);
+  const [highlightCycleRunning, setHighlightCycleRunning] = useState(false);
   const [toastMsg, setToastMsg] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -140,8 +150,12 @@ export const ExtractionPipelineView = () => {
         (result.summary.already_ready ?? 0) +
         (result.summary.no_source_video ?? 0);
       const failed = result.summary.failed ?? 0;
+      const hl = result.highlightPhase;
+      const hlEnqueued = hl?.summary.highlight_clips_enqueued ?? 0;
+      const hlReady = hl?.summary.highlights_ready ?? 0;
+      const hlProcessing = hl?.summary.highlights_processing ?? 0;
       showToast(
-        `Mux cycle ${selectedDate}: ${started} upload(s) started, ${polled} polled, ${skipped} skipped, ${failed} failed (${result.processed}/${result.totalCandidates})`,
+        `Mux cycle ${selectedDate}: ${started} video upload(s), ${polled} polled, ${skipped} skipped, ${failed} failed. Highlights: ${hlEnqueued} enqueued, ${hlReady} ready, ${hlProcessing} processing.`,
       );
       await fetchAll(true);
     } catch (err: any) {
@@ -151,12 +165,47 @@ export const ExtractionPipelineView = () => {
     }
   };
 
+  const handleStartHighlightMuxCycle = async () => {
+    setHighlightCycleRunning(true);
+    try {
+      const result = await AdminApi.runHighlightMuxCycle(selectedDate);
+      const enqueued = result.summary.highlight_clips_enqueued ?? 0;
+      const ready = result.summary.highlights_ready ?? 0;
+      const processing = result.summary.highlights_processing ?? 0;
+      const pending = result.summary.highlights_pending ?? 0;
+      showToast(
+        `HL Mux cycle ${selectedDate}: ${enqueued} enqueued, ${ready} ready, ${processing} processing, ${pending} pending (${result.processed}/${result.totalCandidates})`,
+      );
+      await fetchAll(true);
+    } catch (err: any) {
+      showToast(err?.message || 'Highlight Mux cycle failed');
+    } finally {
+      setHighlightCycleRunning(false);
+    }
+  };
+
   const pendingMuxForDay = useMemo(
     () =>
       requests.filter((row) => row.hasS3 && !row.hasMux && !row.muxProcessing)
         .length,
     [requests],
   );
+
+  const highlightSummary = useMemo(() => {
+    let totalHighlights = 0;
+    let readyHighlights = 0;
+    let pendingClips = 0;
+    let processingClips = 0;
+    for (const row of requests) {
+      const hl = row.highlightMux;
+      if (!hl || hl.status === 'none') continue;
+      totalHighlights += hl.total;
+      readyHighlights += hl.ready;
+      pendingClips += hl.withoutAssetId + hl.pending;
+      processingClips += hl.processing;
+    }
+    return { totalHighlights, readyHighlights, pendingClips, processingClips };
+  }, [requests]);
 
   const summary = useMemo(() => {
     const isReady = (r: AdminExtractionRequestItem) =>
@@ -205,10 +254,11 @@ export const ExtractionPipelineView = () => {
             <h3 style={{ fontSize: 18, fontWeight: 700 }}>Extraction Pipeline Monitor</h3>
           </div>
           <p style={{ color: 'var(--text-muted)', fontSize: 14 }}>
-            One row per match session (dual NVR channels grouped). Use{' '}
-            <strong style={{ color: 'var(--primary-neon)' }}>Sync HL</strong> to pull S3 highlights
-            or <strong style={{ color: 'var(--primary-neon)' }}>Start Mux Cycle</strong> to ingest
-            all S3-ready videos for the selected day into Mux (one by one).
+            One row per match session (dual NVR channels grouped).{' '}
+            <strong style={{ color: 'var(--primary-neon)' }}>Start Mux Cycle</strong> ingests
+            full-match videos in parallel (backfill). Phase 2 auto-cuts highlight clips from those
+            Mux assets. Use <strong style={{ color: 'var(--primary-neon)' }}>HL Mux Cycle</strong>{' '}
+            for existing videos that already have playback but highlights lack Mux clip IDs.
           </p>
         </div>
 
@@ -242,6 +292,17 @@ export const ExtractionPipelineView = () => {
           >
             <PlayCircle size={16} className={muxCycleRunning ? 'spin' : undefined} />
             {muxCycleRunning ? 'Mux cycle running…' : 'Start Mux Cycle'}
+          </button>
+          <button
+            type="button"
+            className="btn-primary"
+            onClick={handleStartHighlightMuxCycle}
+            disabled={highlightCycleRunning || refreshing}
+            style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}
+            title="Queue Mux clip cuts for highlights on playable recordings"
+          >
+            <Sparkles size={16} className={highlightCycleRunning ? 'spin' : undefined} />
+            {highlightCycleRunning ? 'HL Mux running…' : 'HL Mux Cycle'}
           </button>
           <button
             type="button"
@@ -285,6 +346,27 @@ export const ExtractionPipelineView = () => {
           <div className="glass-card" style={{ padding: 16 }}>
             <div style={{ color: 'var(--text-muted)', fontSize: 12 }}>Today ready</div>
             <div style={{ fontSize: 28, fontWeight: 800, color: '#00E676' }}>{summary.ready}</div>
+          </div>
+          <div className="glass-card" style={{ padding: 16 }}>
+            <div style={{ color: 'var(--text-muted)', fontSize: 12 }}>HL Mux ready</div>
+            <div style={{ fontSize: 28, fontWeight: 800, color: '#00E676' }}>
+              {highlightSummary.readyHighlights}
+              {highlightSummary.totalHighlights > 0
+                ? ` / ${highlightSummary.totalHighlights}`
+                : ''}
+            </div>
+          </div>
+          <div className="glass-card" style={{ padding: 16 }}>
+            <div style={{ color: 'var(--text-muted)', fontSize: 12 }}>HL need Mux clip</div>
+            <div style={{ fontSize: 28, fontWeight: 800, color: 'var(--accent-purple)' }}>
+              {highlightSummary.pendingClips}
+            </div>
+          </div>
+          <div className="glass-card" style={{ padding: 16 }}>
+            <div style={{ color: 'var(--text-muted)', fontSize: 12 }}>HL Mux processing</div>
+            <div style={{ fontSize: 28, fontWeight: 800, color: '#FFD600' }}>
+              {highlightSummary.processingClips}
+            </div>
           </div>
           <div className="glass-card" style={{ padding: 16 }}>
             <div style={{ color: 'var(--text-muted)', fontSize: 12 }}>Today failed</div>
@@ -442,7 +524,30 @@ export const ExtractionPipelineView = () => {
                                   : 'var(--text-dim)',
                             }}
                           >
-                            {row.hasMux ? '✓ Mux' : row.muxProcessing ? '◐ Mux' : '○ Mux'}
+                            {row.hasMux ? '✓ Video Mux' : row.muxProcessing ? '◐ Video Mux' : '○ Video Mux'}
+                          </span>
+                          <span
+                            style={{
+                              color:
+                                row.highlightMux?.status === 'ready' || row.highlightMux?.status === 'none'
+                                  ? '#00E676'
+                                  : row.highlightMux?.status === 'processing' ||
+                                      row.highlightMux?.status === 'partial'
+                                    ? '#FFD600'
+                                    : row.highlightMux?.status === 'failed'
+                                      ? '#FF3D57'
+                                      : 'var(--text-dim)',
+                            }}
+                          >
+                            {row.highlightMux?.status === 'ready'
+                              ? `✓ HL Mux (${row.highlightMux.ready}/${row.highlightMux.total})`
+                              : row.highlightMux?.status === 'partial'
+                                ? `◐ HL Mux (${highlightMuxLabel(row)})`
+                                : row.highlightMux?.status === 'processing'
+                                  ? `◐ HL Mux (${highlightMuxLabel(row)})`
+                                  : row.highlightMux?.status === 'none'
+                                    ? '○ HL Mux'
+                                    : `○ HL Mux (${highlightMuxLabel(row)})`}
                           </span>
                           {row.extractAttempts > 1 && (
                             <span style={{ color: 'var(--accent-amber)' }}>
