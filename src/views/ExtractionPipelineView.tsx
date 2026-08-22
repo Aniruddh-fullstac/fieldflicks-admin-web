@@ -152,19 +152,20 @@ export const ExtractionPipelineView = () => {
   };
 
   const pendingMuxForDay = useMemo(
-    () => requests.filter((row) => row.hasS3 && !row.hasMux).length,
+    () =>
+      requests.filter((row) => row.hasS3 && !row.hasMux && !row.muxProcessing)
+        .length,
     [requests],
   );
 
   const summary = useMemo(() => {
-    const inFlight = requests.filter((r) =>
-      ['extracting', 'requested', 'pending', 'uploading', 'uploaded', 'processing'].includes(
-        String(r.status).toLowerCase(),
-      ),
+    const isReady = (r: AdminExtractionRequestItem) =>
+      r.hasMux ||
+      ['completed', 'ready'].includes(String(r.status).toLowerCase());
+    const inFlight = requests.filter(
+      (r) => !isReady(r) && !['failed', 'cancelled'].includes(String(r.status).toLowerCase()),
     ).length;
-    const ready = requests.filter((r) =>
-      ['completed', 'ready'].includes(String(r.status).toLowerCase()),
-    ).length;
+    const ready = requests.filter(isReady).length;
     const failed = requests.filter((r) =>
       ['failed', 'cancelled'].includes(String(r.status).toLowerCase()),
     ).length;
@@ -432,8 +433,16 @@ export const ExtractionPipelineView = () => {
                           <span style={{ color: row.hasS3 ? '#00E676' : 'var(--text-dim)' }}>
                             {row.hasS3 ? '✓ S3' : '○ S3'}
                           </span>
-                          <span style={{ color: row.hasMux ? '#00E676' : 'var(--text-dim)' }}>
-                            {row.hasMux ? '✓ Mux' : '○ Mux'}
+                          <span
+                            style={{
+                              color: row.hasMux
+                                ? '#00E676'
+                                : row.muxProcessing
+                                  ? '#FFD600'
+                                  : 'var(--text-dim)',
+                            }}
+                          >
+                            {row.hasMux ? '✓ Mux' : row.muxProcessing ? '◐ Mux' : '○ Mux'}
                           </span>
                           {row.extractAttempts > 1 && (
                             <span style={{ color: 'var(--accent-amber)' }}>

@@ -296,6 +296,7 @@ export interface AdminExtractionRequestItem {
   muxPlaybackId?: string;
   s3Path?: string;
   hasMux: boolean;
+  muxProcessing?: boolean;
   hasS3: boolean;
   updatedAt: string;
   extractAttempts: number;
