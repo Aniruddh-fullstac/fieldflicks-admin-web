@@ -221,6 +221,34 @@ function countNoSourceVideoSummary(summary: Record<string, number>): number {
   }, 0);
 }
 
+function channelMuxLabel(ch: { nvrChannel: number; hasS3: boolean; hasMux: boolean; muxProcessing?: boolean }): string {
+  const tag = `Ch${ch.nvrChannel}`;
+  if (ch.hasMux) return `${tag} ✓`;
+  if (ch.muxProcessing || (ch.hasS3 && !ch.hasMux)) return `${tag} ◐`;
+  if (ch.hasS3) return `${tag} ○`;
+  return `${tag} —`;
+}
+
+function formatChannelVideoMux(row: AdminExtractionRequestItem): string {
+  const channels = row.channelDetails ?? [];
+  if (channels.length <= 1) {
+    return row.hasMux ? '✓ Video Mux' : row.muxProcessing ? '◐ Video Mux' : '○ Video Mux';
+  }
+  const parts = channels.map(channelMuxLabel).join(' · ');
+  return row.hasMux ? `✓ Video Mux (${parts})` : row.muxProcessing ? `◐ Video Mux (${parts})` : `○ Video Mux (${parts})`;
+}
+
+function formatChannelS3(row: AdminExtractionRequestItem): string {
+  const channels = row.channelDetails ?? [];
+  if (channels.length <= 1) {
+    return row.hasS3 ? '✓ S3' : '○ S3';
+  }
+  const parts = channels
+    .map((ch) => `${ch.hasS3 ? 'Ch' + ch.nvrChannel + ' ✓' : 'Ch' + ch.nvrChannel + ' ○'}`)
+    .join(' · ');
+  return row.hasS3 ? `✓ S3 (${parts})` : `○ S3 (${parts})`;
+}
+
 export const ExtractionPipelineView = () => {
   const [selectedDate, setSelectedDate] = useState(todayIstDateInput());
   const [requests, setRequests] = useState<AdminExtractionRequestItem[]>([]);
@@ -1053,7 +1081,7 @@ export const ExtractionPipelineView = () => {
                               cursor: noSourceHint ? 'help' : undefined,
                             }}
                           >
-                            {row.hasS3 ? '✓ S3' : '○ S3'}
+                            {formatChannelS3(row)}
                             {noSourceHint ? (
                               <span
                                 style={{
@@ -1081,7 +1109,7 @@ export const ExtractionPipelineView = () => {
                                   : 'var(--text-dim)',
                             }}
                           >
-                            {row.hasMux ? '✓ Video Mux' : row.muxProcessing ? '◐ Video Mux' : '○ Video Mux'}
+                            {formatChannelVideoMux(row)}
                           </span>
                           <span
                             style={{

@@ -283,6 +283,16 @@ export interface AdminHighlightMuxSummary {
   status: 'none' | 'ready' | 'processing' | 'pending' | 'partial' | 'failed';
 }
 
+export interface AdminExtractionChannelDetail {
+  id: string;
+  nvrChannel: number;
+  status: string;
+  hasS3: boolean;
+  hasMux: boolean;
+  muxProcessing?: boolean;
+  muxPlaybackId?: string | null;
+}
+
 export interface AdminExtractionRequestItem {
   id: string;
   userId?: string;
@@ -315,6 +325,7 @@ export interface AdminExtractionRequestItem {
   highlightMux?: AdminHighlightMuxSummary;
   hasHighlightMux?: boolean;
   highlightMuxProcessing?: boolean;
+  channelDetails?: AdminExtractionChannelDetail[];
 }
 
 export interface AdminPipelineStorageAudit {
