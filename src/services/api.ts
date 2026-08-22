@@ -440,6 +440,27 @@ export const AdminApi = {
     return extractData<any>(res);
   },
 
+  async getExtractionRequests(params?: {
+    date?: string;
+    page?: number;
+    limit?: number;
+  }): Promise<{
+    date: string | null;
+    total: number;
+    page: number;
+    limit: number;
+    totalPages: number;
+    requests: import('../types').AdminExtractionRequestItem[];
+  }> {
+    const res = await api.get('/admin/extraction-requests', { params });
+    return extractData<any>(res);
+  },
+
+  async getPipelineStorageAudit(): Promise<import('../types').AdminPipelineStorageAudit> {
+    const res = await api.get('/admin/pipeline-storage-audit');
+    return extractData<any>(res);
+  },
+
   // 6. FlickShorts Moderation & Public Feed
   async getFlickShorts(sport?: string): Promise<any[]> {
     const res = await api.get('/flick-shorts/admin', { params: { sport } });

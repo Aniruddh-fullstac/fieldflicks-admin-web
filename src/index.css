@@ -133,6 +133,15 @@ h1, h2, h3, h4, h5, h6, .brand-font {
   box-shadow: 0 0 25px rgba(0, 230, 118, 0.4);
 }
 
+.spin {
+  animation: ff-spin 1s linear infinite;
+}
+
+@keyframes ff-spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
 .btn-secondary {
   display: inline-flex;
   align-items: center;

@@ -11,6 +11,7 @@ import { CouponsView } from './views/CouponsView';
 import { LiveFleetView } from './views/LiveFleetView';
 import { WatchStreamView } from './views/WatchStreamView';
 import { RecordingsVaultView } from './views/RecordingsVaultView';
+import { ExtractionPipelineView } from './views/ExtractionPipelineView';
 import { FlickShortsView } from './views/FlickShortsView';
 import { PaymentsView } from './views/PaymentsView';
 import { PricingView } from './views/PricingView';
@@ -94,6 +95,8 @@ export function App() {
         return <LiveFleetView />;
       case 'recordings':
         return <RecordingsVaultView />;
+      case 'pipeline':
+        return <ExtractionPipelineView />;
       case 'flickshorts':
         return <FlickShortsView />;
       case 'users':
@@ -141,6 +144,11 @@ export function App() {
         return {
           title: 'Match Recordings Vault & AI Highlights',
           subtitle: '7-stage extraction pipeline, AI moments verification, and 4K raw downloads',
+        };
+      case 'pipeline':
+        return {
+          title: 'Extraction Pipeline Monitor',
+          subtitle: 'Date-wise match requests, live DB status, highlights in window, S3 vs Mux',
         };
       case 'flickshorts':
         return {

@@ -272,3 +272,44 @@ export interface AdminRecordingItem {
   s3Path?: string;
   createdAt: string;
 }
+
+export interface AdminExtractionRequestItem {
+  id: string;
+  userId?: string;
+  userName: string;
+  userPhone: string;
+  venueName: string;
+  courtName: string;
+  courtNumber: number;
+  cameraId: string;
+  nvrChannel: number;
+  status: string;
+  startTime: string;
+  endTime?: string;
+  durationMinutes?: number | null;
+  linkedHighlightCount: number;
+  highlightsInWindow: number;
+  muxPlaybackId?: string;
+  s3Path?: string;
+  hasMux: boolean;
+  hasS3: boolean;
+  updatedAt: string;
+  extractAttempts: number;
+  extractSessionKey?: string;
+}
+
+export interface AdminPipelineStorageAudit {
+  withoutMuxTotal: number;
+  withS3NoMux: number;
+  byStatusWithoutMux: Array<{ status: string; count: number }>;
+  recentS3NoMux: Array<{
+    id: string;
+    status: string;
+    s3Path?: string;
+    userName: string;
+    courtName: string;
+    venueName: string;
+    startTime?: string;
+    updatedAt?: string;
+  }>;
+}

@@ -42,6 +42,7 @@ export const Sidebar = ({
         { id: 'overview', label: 'Analytics & KPIs', icon: BarChart3 },
         { id: 'fleet', label: 'Fleet & NVR Cameras', icon: Video, badge: activeStreamsCount > 0 ? `${activeStreamsCount} Live` : undefined },
         { id: 'recordings', label: 'Match Vault & AI', icon: Film },
+        { id: 'pipeline', label: 'Extraction Pipeline', icon: ShieldCheck },
         { id: 'flickshorts', label: 'FlickShorts Moderation', icon: Sparkles, badge: 'Queue' },
       ],
     },
